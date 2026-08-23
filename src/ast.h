@@ -3,33 +3,48 @@
 typedef enum {
     AST_PROGRAM,
     AST_VARIABLE,
-    AST_NUMBER,
+    AST_LITERAL,
     AST_OPERATOR,
+    AST_ASSIGNMENT,
     AST_END,
 } ASTType;
+
+typedef enum {
+    OP_PLUS,
+    OP_MINUS,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+} OperatorType;
 
 typedef struct ASTNode {
     ASTType type;
 
-    int value;
-    const char* name;
-    int length;
+   union {
+        struct {
+            int value;
+        } literal;
 
-    struct ASTNode *left;
-    struct ASTNode *right;
+        struct {
+            const char *start;
+            int length;
+        } variable;
+
+        struct {
+            OperatorType operatorType;
+            struct ASTNode *left;
+            struct ASTNode *right;
+        } operation;
+        
+        struct {
+            struct ASTNode *left;
+            struct ASTNode *right;
+        } binary;
+
+        struct {
+            struct ASTNode **statements;
+            int capacity;
+            int count;
+        } program;
+    } data;
+
 } ASTNode;
-
-typedef struct ASTVariable {
-    ASTType type;
-    const char *start;
-    int length;
-} ASTVariable;
-
-typedef struct {
-    ASTType type;
-
-    int variableCount, nodeCount, statementCount;
-    struct ASTVariable variables[256];
-    struct ASTNode nodes[1024];
-    struct ASTNode statements[256];
-} ASTProgram;

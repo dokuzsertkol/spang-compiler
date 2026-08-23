@@ -50,9 +50,9 @@ Token lexer_next_token(Lexer *lexer) {
         return token;
     }
 
-    // number lexer
+    // literal lexer
     if (c >= '0' && c <= '9') {
-        token.type = TOKEN_NUMBER;
+        token.type = TOKEN_LITERAL;
         while (c >= '0' && c <= '9') {
             token.length++;
             c = *(token.start + token.length);
@@ -79,4 +79,18 @@ Token lexer_next_token(Lexer *lexer) {
     lexer->current += token.length;
     
     return token;
+}
+
+int token_to_int(Token* token) {
+    int result = 0;
+
+    for (int i = 0; i < token->length; i++) {
+        result = result * 10 + (*(token->start + i) - '0');
+    }
+
+    return result;
+}
+
+char token_to_char(Token* token) {
+    return *token->start;
 }
