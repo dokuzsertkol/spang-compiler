@@ -9,8 +9,7 @@ add_executable(dokuz
     main.c
     src/lexer.c
     src/parser.c
-    src/compiler.c
-    src/vm.c
+    src/semantic_analyser.c
 )
 
 target_include_directories(dokuz PRIVATE src)

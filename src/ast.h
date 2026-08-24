@@ -2,6 +2,7 @@
 
 typedef enum {
     AST_PROGRAM,
+    AST_VARIABLE_DECLARATION,
     AST_VARIABLE,
     AST_LITERAL,
     AST_OPERATOR,
