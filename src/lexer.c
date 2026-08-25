@@ -67,17 +67,33 @@ Token lexer_next_token(Lexer *lexer) {
             token.type = TOKEN_PLUS;
             token.length = 1;
             break;
+
+        case '-':
+            token.type = TOKEN_MINUS;
+            token.length = 1;
+            break;
+
+        case '*':
+            token.type = TOKEN_MULTIPLY;
+            token.length = 1;
+            break;
+
+        case '/':
+            token.type = TOKEN_DIVIDE;
+            token.length = 1;
+            break;
+
         case '=':
             token.type = TOKEN_EQUAL;
             token.length = 1;
             break;
+
         case '\0':
             token.type = TOKEN_EOF;
             token.length = 1;
             break;
     }
     lexer->current += token.length;
-    
     return token;
 }
 
@@ -93,4 +109,52 @@ int token_to_int(Token* token) {
 
 char token_to_char(Token* token) {
     return *token->start;
+}
+
+// debug
+void lexer_print(const Lexer *lexer) {
+    printf("=== LEXER PRINT ===\n");
+
+    Lexer copy = *lexer;
+    Token token;
+
+    do {
+        token = lexer_next_token(&copy);
+
+        printf("TOKEN: ");
+
+        switch (token.type) {
+            case TOKEN_LET: printf("LET"); break;
+
+            case TOKEN_IDENTIFIER: printf("IDENTIFIER"); break;
+
+            case TOKEN_LITERAL: printf("LITERAL"); break;
+
+            case TOKEN_PLUS: printf("PLUS"); break;
+
+            case TOKEN_MINUS: printf("MINUS"); break;
+
+            case TOKEN_MULTIPLY: printf("MULTIPLY"); break;
+
+            case TOKEN_DIVIDE: printf("DIVIDE"); break;
+
+            case TOKEN_EQUAL: printf("EQUAL"); break;
+
+            case TOKEN_ENDLINE: printf("ENDLINE"); break;
+
+            case TOKEN_EOF: printf("EOF"); break;
+
+            default: printf("UNKNOWN"); break;
+        }
+
+        if (token.type != TOKEN_EOF) {
+            printf(" \"");
+            printf("%.*s", token.length, token.start);
+            printf("\"");
+        }
+
+        putchar('\n');
+
+    } while (token.type != TOKEN_EOF);
+    printf("=== END ===\n\n");
 }

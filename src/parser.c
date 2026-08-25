@@ -104,11 +104,11 @@ static ASTNode* parse_expression(Token *tokens, int count, int *index) {
     return left;
 }
 
-static int parse_assignment(ASTNode *program, Lexer *lexer, Token *token) {
+static int parse_assignment(ASTNode *program, Lexer *lexer, Token *token, Token *identifier) {
     Token tokens[128];
     int count = 0;
 
-    Token variable = *token;
+    Token variable = *identifier;
 
     *token = lexer_next_token(lexer);
 
@@ -186,25 +186,27 @@ ASTNode parse_program(Lexer *lexer) {
         .type = AST_PROGRAM,
         .data.program = {0},
     };
-    if (!program.data.program.statements) return program;
 
     Token token;
-    do {
+    while (1) {
         token = lexer_next_token(lexer);
 
-        if (token.type == TOKEN_LET &&  !parse_variable_declaration(&program, lexer, &token)) break;
+        if (token.type == TOKEN_EOF) break;
 
+        if (token.type == TOKEN_LET) {
+            if (!parse_variable_declaration(&program, lexer, &token)) break;
+        }
         else if (token.type == TOKEN_IDENTIFIER) {
+            Token identifier = token;
             token = lexer_next_token(lexer);
+
             if (token.type == TOKEN_EQUAL) {
-                if(!parse_assignment(&program, lexer, &token)) break;
+                if (!parse_assignment(&program, lexer, &token, &identifier)) break;
             }
             else break;
         }
-        
         else break;
     }
-    while(token.type != TOKEN_EOF);
 
     return program;
 }

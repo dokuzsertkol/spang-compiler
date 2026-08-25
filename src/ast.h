@@ -49,3 +49,6 @@ typedef struct ASTNode {
     } data;
 
 } ASTNode;
+
+//debug
+void ast_print(const ASTNode *program);
