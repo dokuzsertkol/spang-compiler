@@ -12,6 +12,7 @@ add_executable(dokuz
     src/ast.c
     src/semantic_analyser.c
     src/ir.c
+    src/codegen.c
 )
 
 target_include_directories(dokuz PRIVATE src)

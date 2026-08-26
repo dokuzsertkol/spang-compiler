@@ -1,6 +1,8 @@
 #include "src/lexer.h"
 #include "src/parser.h"
+#include "src/semantic_analyser.h"
 #include "src/ir.h"
+#include "src/codegen.h"
 
 
 int main(void) {
@@ -12,8 +14,18 @@ int main(void) {
     ASTNode program = parse_program(&lexer);
     ast_print(&program);
 
-    IR ir = ir_generate(&program);
+    if (!semantic_analyse(&program)) {
+        printf("SEMANTIC ERROR\n");
+        return 1;
+    }
 
+    IR ir = ir_generate(&program);
     ir_print(&ir);
+
+    if (!codegen_generate(&ir, "./output.s")) {
+        printf("CODEGEN ERROR\n");
+        return 1;
+    }
+
     return 0;
 }
