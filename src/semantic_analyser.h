@@ -3,6 +3,7 @@
 
 typedef struct {
     const char *name;
+    int length;
 } Symbol;
 
 typedef struct {

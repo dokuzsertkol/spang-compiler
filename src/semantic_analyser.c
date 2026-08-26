@@ -3,17 +3,18 @@
 #include "semantic_analyser.h"
 #include "ast.h"
 
-static int symbol_exists(const SymbolTable *table, const char* name) {
+static int symbol_exists(const SymbolTable *table, const char* name, int length) {
     for (int i = 0; i < table->count; i++) {
-        if (strcmp(name, table->symbols[i].name) == 0) return 1;
+        if (table->symbols[i].length != length) continue;
+        if (strncmp(name, table->symbols[i].name, length) == 0) return 1;
     }
     return 0;
 }
 
-static int symbol_add(SymbolTable *table, const char* name) {
-    if (symbol_exists(table, name)) return 0;
+static int symbol_add(SymbolTable *table, const char* name, int length) {
+    if (symbol_exists(table, name, length)) return 0;
 
-    Symbol symbol = {name};
+    Symbol symbol = {name, length};
 
     if (table->count >= table->capacity) {
         int newCapacity = table->capacity == 0 ? 8 : table->capacity * 2;
@@ -33,7 +34,7 @@ static int analyse_expression(SymbolTable *table, const ASTNode *expression) {
     switch (expression->type) {
         case AST_LITERAL: return 1;
 
-        case AST_VARIABLE: return symbol_exists(table, expression->data.variable.start);
+        case AST_VARIABLE: return symbol_exists(table, expression->data.variable.start, expression->data.variable.length);
 
         case AST_OPERATOR:
             return analyse_expression(table, expression->data.operation.left) 
@@ -44,19 +45,10 @@ static int analyse_expression(SymbolTable *table, const ASTNode *expression) {
 }
 
 static int analyse_assignment(SymbolTable *table, const ASTNode* assignment) {
-    if (!symbol_exists(table, assignment->data.binary.left->data.variable.start)) return 0;
+    if (!symbol_exists(table, assignment->data.binary.left->data.variable.start, 
+        assignment->data.binary.left->data.variable.length)) return 0;
 
-    ASTNode expression = *assignment->data.binary.right;
-
-    while (expression.type == AST_OPERATOR) {
-        if (expression.data.operation.left->type != AST_LITERAL) return 0;
-        if (expression.data.operation.right->type == AST_OPERATOR) {
-            expression = *expression.data.operation.right;
-        }
-        else if (expression.data.operation.right->type == AST_LITERAL) break;
-        else return 0;
-    }
-    return 1;
+    return analyse_expression(table, assignment->data.binary.right);
 }
 
 int semantic_analyse(const ASTNode *program) {
@@ -66,10 +58,10 @@ int semantic_analyse(const ASTNode *program) {
         const ASTNode statement = *program->data.program.statements[i];
         
         if (statement.type == AST_VARIABLE_DECLARATION) {
-            if (!symbol_add(&table, statement.data.variable.start)) return 0;
+            if (!symbol_add(&table, statement.data.variable.start, statement.data.variable.length)) return 0;
         }
         if (statement.type == AST_ASSIGNMENT) {
-            if (! analyse_assignment(&table, &statement)) return 0;
+            if (!analyse_assignment(&table, &statement)) return 0;
         }
     }
     return 1;
