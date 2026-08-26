@@ -13,12 +13,8 @@ typedef struct {
 
     union {
         int temp;
-        long literal;
-        
-        struct {
-            const char *start;
-            int length;
-        } variable;
+        int variable;
+        int literal;
     } value;
 
 } IROperand;

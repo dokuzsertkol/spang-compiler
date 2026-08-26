@@ -15,25 +15,26 @@ static IROperand operand_temp(int temp) {
     };
 }
 
-static IROperand operand_literal(long value) {
+static IROperand operand_literal(int value) {
     return (IROperand) {
         .type = IR_OPERAND_LITERAL,
         .value.literal = value
     };
 }
 
-static IROperand operand_variable(const char *name, int length) {
+static IROperand operand_variable(int variable) {
     return (IROperand) {
         .type = IR_OPERAND_VARIABLE,
-        .value.variable = {
-            .start = name,
-            .length = length,
-        },
+        .value.variable = variable,
     };
 }
 
 static int new_temp(int *tempCount) {
     return (*tempCount)++;
+}
+
+static int new_variable(int *variableCount) {
+    return (*variableCount)++;
 }
 
 static int ir_add_instruction(IR *program, IRInstruction instruction) {
@@ -52,7 +53,7 @@ static int ir_add_instruction(IR *program, IRInstruction instruction) {
     return 1;
 }
 
-static int generate_expression(const ASTNode *node, IR *program, int *tempCount, IROperand *result) {
+static int generate_expression(const ASTNode *node, IR *program, int *tempCount, int *variableCount, IROperand *result) {
     switch (node->type) {
         case AST_LITERAL: {
             int temp = new_temp(tempCount);
@@ -70,14 +71,12 @@ static int generate_expression(const ASTNode *node, IR *program, int *tempCount,
 
         case AST_VARIABLE: {
             int temp = new_temp(tempCount);
+            int variable = new_variable(variableCount);
 
             if (!ir_add_instruction(program, (IRInstruction) {
                 .op = IR_LOAD,
                 .dest = operand_temp(temp),
-                .left = operand_variable(
-                    node->data.variable.start,
-                    node->data.variable.length
-                ),
+                .left = operand_variable(variable),
                 .right = operand_none()
             })) return 0;
 
@@ -89,9 +88,9 @@ static int generate_expression(const ASTNode *node, IR *program, int *tempCount,
             IROperand left;
             IROperand right;
 
-            if (!generate_expression(node->data.operation.left, program, tempCount, &left)) return 0;
+            if (!generate_expression(node->data.operation.left, program, tempCount, variableCount, &left)) return 0;
 
-            if (!generate_expression(node->data.operation.right, program, tempCount, &right)) return 0;
+            if (!generate_expression(node->data.operation.right, program, tempCount, variableCount, &right)) return 0;
 
             int temp = new_temp(tempCount);
 
@@ -126,7 +125,7 @@ static int generate_expression(const ASTNode *node, IR *program, int *tempCount,
     }
 }
 
-static int generate_statement(const ASTNode *node, IR *program, int *tempCount) {
+static int generate_statement(const ASTNode *node, IR *program, int *tempCount, int *variableCount) {
     switch (node->type) {
 
         case AST_VARIABLE_DECLARATION: {
@@ -136,14 +135,11 @@ static int generate_statement(const ASTNode *node, IR *program, int *tempCount) 
         case AST_ASSIGNMENT: {
             IROperand value;
 
-            if (!generate_expression(node->data.binary.right, program, tempCount, &value)) return 0;
+            if (!generate_expression(node->data.binary.right, program, tempCount, variableCount, &value)) return 0;
 
             return ir_add_instruction(program, (IRInstruction) {
                 .op = IR_STORE,
-                .dest = operand_variable(
-                    node->data.binary.left->data.variable.start,
-                    node->data.binary.left->data.variable.length
-                ),
+                .dest = operand_variable(*variableCount),
                 .left = value,
                 .right = operand_none()
             });
@@ -161,11 +157,12 @@ IR ir_generate(const ASTNode *program) {
     };
 
     int tempCount = 0;
+    int variableCount = 0;
 
     for (int i = 0; i < program->data.program.count; i++) {
         const ASTNode *statement = program->data.program.statements[i];
 
-        if (!generate_statement(statement, &ir, &tempCount)) {
+        if (!generate_statement(statement, &ir, &tempCount, &variableCount)) {
             free(ir.instructions);
 
             return (IR) {
@@ -185,11 +182,9 @@ static void print_operand(IROperand operand) {
 
         case IR_OPERAND_TEMP: printf("t%i", operand.value.temp); break;
 
-        case IR_OPERAND_LITERAL: printf("%ld", operand.value.literal); break;
+        case IR_OPERAND_LITERAL: printf("%i", operand.value.literal); break;
 
-        case IR_OPERAND_VARIABLE:
-            for (int i = 0; i < operand.value.variable.length; i++) printf("%c", operand.value.variable.start[i]);
-            break;
+        case IR_OPERAND_VARIABLE: printf("v%i", operand.value.variable); break;
     }
 }
 
