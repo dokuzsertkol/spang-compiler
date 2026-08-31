@@ -1,18 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(dokuz C)
+project(spangc C)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-add_executable(dokuz
+add_executable(spangc
     main.c
     src/lexer.c
-    src/parser.c
-    src/ast.c
-    src/semantic_analyser.c
-    src/ir.c
-    src/codegen.c
 )
 
-target_include_directories(dokuz PRIVATE src)
+target_include_directories(spangc PRIVATE src)

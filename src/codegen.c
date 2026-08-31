@@ -99,7 +99,7 @@ int codegen_generate(const IR *ir, const char *outputPath){
                 fprintf(output, "    mov %i(%%rbp), %%rax\n", temp_offset(instruction->left.value.temp,
                     layout.variableCount));
                 fprintf(output, "    cqto\n");
-                fprintf(output, "    idiv %i(%%rbp)\n", temp_offset(instruction->right.value.temp,
+                fprintf(output, "    idivq %i(%%rbp)\n", temp_offset(instruction->right.value.temp,
                     layout.variableCount));
                 fprintf(output, "    mov %%rax, %i(%%rbp)\n", temp_offset(instruction->dest.value.temp,
                     layout.variableCount));
@@ -107,8 +107,14 @@ int codegen_generate(const IR *ir, const char *outputPath){
         }
     }
 
+    /*
     fprintf(output, "   mov $60, %%rax\n");
     fprintf(output, "   xor %%rdi, %%rdi\n");
+    fprintf(output, "   syscall\n");
+    */
+
+    fprintf(output, "   mov -8(%%rbp), %%rdi\n");
+    fprintf(output, "   mov $60, %%rax\n");
     fprintf(output, "   syscall\n");
 
     fclose(output);

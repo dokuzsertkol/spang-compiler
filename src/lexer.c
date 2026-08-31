@@ -1,5 +1,5 @@
-#include "lexer.h"
 #include <string.h>
+#include "lexer.h"
 
 Lexer lexer_init(const char *source) {
     Lexer lexer;
@@ -13,34 +13,65 @@ Lexer lexer_init(const char *source) {
 Token lexer_next_token(Lexer *lexer) {
     Token token;
 
+    while (1) {
+        // whitespace
+        while (*lexer->current == ' ' || *lexer->current == '\n' || *lexer->current == '\t') lexer->current++;
+        
+        // comment
+        if (lexer->current[0] == '/' && lexer->current[1] == '/') {
+            while (*lexer->current != '\n' && *lexer->current != '\0') lexer->current++;
+            continue;
+        }
+        if (lexer->current[0] == '/' && lexer->current[1] == '*') {
+            while (*lexer->current != '\0' || (lexer->current[0] == '*' && lexer->current[1] == '/')) lexer->current++;
+            continue;
+        }
+        break;
+    }
+
     token.start = lexer->current;
     token.length = 0;
-    
+
     char c = *token.start;
-
-    // whitespace skipper
-    while (c == ' ' || c == '\n' || c == '\t') {
-        lexer->current++;
-        c = *(++token.start);
-    }
-
-    // line end lexer
-    if (c == '.') {
-        token.type = TOKEN_ENDLINE;
-        token.length = 1;
-        lexer->current++;
-        return token;
-    }
 
     // string lexer
     if (c >= 'a' && c <= 'z') {
-        while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')) {
-            token.length++;
-            c = *(token.start + token.length);
+        while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c == '_')) {
+            c = *(token.start + ++token.length);
         }
 
-        if (strncmp(token.start, "let", token.length) == 0) {
-            token.type = TOKEN_LET;
+        if (token.length == 2 && strncmp(token.start, "if", 2) == 0) {
+            token.type = TOKEN_IF;
+        }
+        else if (token.length == 3 && strncmp(token.start, "int", 3) == 0) {
+            token.type = TOKEN_INT;
+        }
+        else if (token.length == 4 && strncmp(token.start, "char", 4) == 0) {
+            token.type = TOKEN_CHAR;
+        }
+        else if (token.length == 4 && strncmp(token.start, "bool", 4) == 0) {
+            token.type = TOKEN_BOOL;
+        }
+        else if (token.length == 4 && strncmp(token.start, "else", 4) == 0) {
+            token.type = TOKEN_ELSE;
+        }
+        else if (token.length == 4 && strncmp(token.start, "true", 4) == 0) {
+            token.type = TOKEN_TRUE;
+        }
+        else if (token.length == 5 && strncmp(token.start, "false", 5) == 0) {
+            token.type = TOKEN_FALSE;
+        }
+        else if (token.length == 5 && strncmp(token.start, "float", 5) == 0) {
+            token.type = TOKEN_FLOAT;
+        }
+        else if (token.length == 5 && strncmp(token.start, "while", 5) == 0) {
+            token.type = TOKEN_WHILE;
+        }
+        else if (token.length == 5 && strncmp(token.start, "break", 5) == 0) {
+            token.type = TOKEN_BREAK;
+        }
+        else if (token.length == 6 && strncmp(token.start, "return", 6) == 0) {
+            token.type = TOKEN_RETURN;
         }
         else {
             token.type = TOKEN_IDENTIFIER;
@@ -53,7 +84,10 @@ Token lexer_next_token(Lexer *lexer) {
     // literal lexer
     if (c >= '0' && c <= '9') {
         token.type = TOKEN_LITERAL;
-        while (c >= '0' && c <= '9') {
+        int dotCount = 0;
+        while ((c >= '0' && c <= '9') || (c == 'b') || (c == '.')) {
+            if (c == 'b') { token.length++; break; }
+            if (c == '.' && !dotCount++) { token.type = TOKEN_ERROR; break; }
             token.length++;
             c = *(token.start + token.length);
         }
@@ -61,54 +95,73 @@ Token lexer_next_token(Lexer *lexer) {
         return token;
     }
 
-    // operator lexer
+    // punction lexer
+    token.length = 1;
     switch (c) {
-        case '+':
-            token.type = TOKEN_PLUS;
-            token.length = 1;
-            break;
+        case ';': token.type = TOKEN_SEMICOLON; break;
 
-        case '-':
-            token.type = TOKEN_MINUS;
-            token.length = 1;
-            break;
+        case '[': token.type = TOKEN_LEFT_BRACKET; break;
 
-        case '*':
-            token.type = TOKEN_MULTIPLY;
-            token.length = 1;
-            break;
+        case ']': token.type = TOKEN_RIGHT_BRACKET; break;
 
-        case '/':
-            token.type = TOKEN_DIVIDE;
-            token.length = 1;
-            break;
+        case '{': token.type = TOKEN_LEFT_BRACE; break;
 
-        case '=':
-            token.type = TOKEN_EQUAL;
-            token.length = 1;
-            break;
+        case '}': token.type = TOKEN_RIGHT_BRACE; break;
 
-        case '\0':
-            token.type = TOKEN_EOF;
-            token.length = 1;
+        case '(': token.type = TOKEN_LEFT_PAREN; break;
+
+        case ')': token.type = TOKEN_RIGHT_PAREN; break;
+
+        case '.': token.type = TOKEN_DOT; break;
+
+        case ',': token.type = TOKEN_COMMA; break;
+
+        case '\'': token.type = TOKEN_APOST; break;
+
+        case '+': token.type = TOKEN_PLUS; break;
+
+        case '-': token.type = TOKEN_MINUS; break;
+
+        case '*': token.type = TOKEN_ASTER; break;
+
+        case '/': {
+            token.type = TOKEN_SLASH; break;
+        }
+
+        case '=': {
+            if (lexer->current[1] == '=') {
+                token.type = TOKEN_EQUAL_EQUAL;
+                token.length = 2;
+            } else token.type = TOKEN_EQUAL;
             break;
+        }
+        case '>': {
+            if (lexer->current[1] == '=') {
+                token.type = TOKEN_GREATER_EQUAL;
+                token.length = 2;
+            } else token.type = TOKEN_GREATER;
+            break;
+        }
+        case '<': {
+            if (lexer->current[1] == '=') {
+                token.type = TOKEN_LESS_EQUAL;
+                token.length = 2;
+            } else token.type = TOKEN_LESS;
+            break;
+        }
+        case '!': {
+            if (lexer->current[1] == '=') {
+                token.type = TOKEN_NOT_EQUAL;
+                token.length = 2;
+            } else token.type = TOKEN_ERROR;
+            break;
+        }
+        case '\0': token.type = TOKEN_EOF; break;
+        
+        default: token.type = TOKEN_ERROR; break;
     }
     lexer->current += token.length;
     return token;
-}
-
-int token_to_int(Token* token) {
-    int result = 0;
-
-    for (int i = 0; i < token->length; i++) {
-        result = result * 10 + (*(token->start + i) - '0');
-    }
-
-    return result;
-}
-
-char token_to_char(Token* token) {
-    return *token->start;
 }
 
 // debug
@@ -124,27 +177,48 @@ void lexer_print(const Lexer *lexer) {
         printf("TOKEN: ");
 
         switch (token.type) {
-            case TOKEN_LET: printf("LET"); break;
+            case TOKEN_EOF: printf("EOF"); break;
+            case TOKEN_ERROR: printf("ERROR"); break;
 
-            case TOKEN_IDENTIFIER: printf("IDENTIFIER"); break;
+            case TOKEN_LEFT_BRACKET: printf("LEFT_BRACKET"); break;
+            case TOKEN_RIGHT_BRACKET: printf("RIGHT_BRACKET"); break;
+            case TOKEN_LEFT_BRACE: printf("LEFT_BRACE"); break;
+            case TOKEN_RIGHT_BRACE: printf("RIGHT_BRACE"); break;
+            case TOKEN_LEFT_PAREN: printf("LEFT_PAREN"); break;
+            case TOKEN_RIGHT_PAREN: printf("RIGHT_PAREN"); break;
 
-            case TOKEN_LITERAL: printf("LITERAL"); break;
+            case TOKEN_SEMICOLON: printf("SEMICOLON"); break;
+            case TOKEN_DOT: printf("DOT"); break;
+            case TOKEN_COMMA: printf("COMMA"); break;
+            case TOKEN_APOST: printf("APOST"); break;
 
             case TOKEN_PLUS: printf("PLUS"); break;
-
             case TOKEN_MINUS: printf("MINUS"); break;
-
-            case TOKEN_MULTIPLY: printf("MULTIPLY"); break;
-
-            case TOKEN_DIVIDE: printf("DIVIDE"); break;
+            case TOKEN_ASTER: printf("ASTERIX"); break;
+            case TOKEN_SLASH: printf("SLASH"); break;
 
             case TOKEN_EQUAL: printf("EQUAL"); break;
+            case TOKEN_EQUAL_EQUAL: printf("EQUAL_EQUAL"); break;
+            case TOKEN_NOT_EQUAL: printf("NOT_EQUAL"); break;
+            case TOKEN_LESS: printf("LESS"); break;
+            case TOKEN_GREATER: printf("GREATER"); break;
+            case TOKEN_LESS_EQUAL: printf("LESS_EQUAL"); break;
+            case TOKEN_GREATER_EQUAL: printf("GREATER_EQUAL"); break;
 
-            case TOKEN_ENDLINE: printf("ENDLINE"); break;
+            case TOKEN_INT: printf("INT"); break;
+            case TOKEN_CHAR: printf("CHAR"); break;
+            case TOKEN_FLOAT: printf("FLOAT"); break;
+            case TOKEN_BOOL: printf("BOOL"); break;
+            case TOKEN_RETURN: printf("RETURN"); break;
+            case TOKEN_IF: printf("IF"); break;
+            case TOKEN_ELSE: printf("ELSE"); break;
+            case TOKEN_WHILE: printf("WHILE"); break;
+            case TOKEN_BREAK: printf("BREAK"); break;
 
-            case TOKEN_EOF: printf("EOF"); break;
-
-            default: printf("UNKNOWN"); break;
+            case TOKEN_LITERAL: printf("LITERAL"); break;
+            case TOKEN_TRUE: printf("TRUE"); break;
+            case TOKEN_FALSE: printf("FALSE"); break;
+            case TOKEN_IDENTIFIER: printf("IDENTIFIER"); break;
         }
 
         if (token.type != TOKEN_EOF) {
