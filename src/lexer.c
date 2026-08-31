@@ -36,8 +36,8 @@ Token lexer_next_token(Lexer *lexer) {
     char c = *token.start;
 
     // string lexer
-    if (c >= 'a' && c <= 'z') {
-        while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c == '_')) {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+        while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) {
             c = *(token.start + ++token.length);
         }
 
@@ -52,6 +52,9 @@ Token lexer_next_token(Lexer *lexer) {
         }
         else if (token.length == 4 && strncmp(token.start, "bool", 4) == 0) {
             token.type = TOKEN_BOOL;
+        }
+        else if (token.length == 4 && strncmp(token.start, "void", 4) == 0) {
+            token.type = TOKEN_VOID;
         }
         else if (token.length == 4 && strncmp(token.start, "else", 4) == 0) {
             token.type = TOKEN_ELSE;
@@ -227,6 +230,7 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_CHAR: printf("CHAR"); break;
             case TOKEN_FLOAT: printf("FLOAT"); break;
             case TOKEN_BOOL: printf("BOOL"); break;
+            case TOKEN_VOID: printf("VOID"); break;
             case TOKEN_RETURN: printf("RETURN"); break;
             case TOKEN_IF: printf("IF"); break;
             case TOKEN_ELSE: printf("ELSE"); break;

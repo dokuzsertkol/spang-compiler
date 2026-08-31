@@ -36,6 +36,7 @@ typedef enum {
     TOKEN_CHAR,
     TOKEN_FLOAT,
     TOKEN_BOOL,
+    TOKEN_VOID,
     TOKEN_RETURN,
     TOKEN_IF,
     TOKEN_ELSE,
