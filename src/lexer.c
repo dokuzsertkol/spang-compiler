@@ -1,5 +1,6 @@
 #include <string.h>
 #include "lexer.h"
+#include "token.h"
 
 Lexer lexer_init(const char *source) {
     Lexer lexer;
@@ -95,7 +96,7 @@ Token lexer_next_token(Lexer *lexer) {
         return token;
     }
 
-    // punction lexer
+    // punctuation lexer
     token.length = 1;
     switch (c) {
         case ';': token.type = TOKEN_SEMICOLON; break;
@@ -153,6 +154,20 @@ Token lexer_next_token(Lexer *lexer) {
             if (lexer->current[1] == '=') {
                 token.type = TOKEN_NOT_EQUAL;
                 token.length = 2;
+            } else token.type = TOKEN_EXCLAM;
+            break;
+        }
+        case '&': {
+            if (lexer->current[1] == '&') {
+                token.type = TOKEN_AMPERS_AMPERS;
+                token.length = 2;
+            } else token.type = TOKEN_ERROR;
+            break;
+        }
+        case '|': {
+            if (lexer->current[1] == '|') {
+                token.type = TOKEN_BAR_BAR;
+                token.length = 2;
             } else token.type = TOKEN_ERROR;
             break;
         }
@@ -204,6 +219,9 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_GREATER: printf("GREATER"); break;
             case TOKEN_LESS_EQUAL: printf("LESS_EQUAL"); break;
             case TOKEN_GREATER_EQUAL: printf("GREATER_EQUAL"); break;
+            case TOKEN_AMPERS_AMPERS: printf("LESS"); break;
+            case TOKEN_BAR_BAR: printf("BAR_BAR"); break;
+            case TOKEN_EXCLAM: printf("EXCLAM"); break;
 
             case TOKEN_INT: printf("INT"); break;
             case TOKEN_CHAR: printf("CHAR"); break;
