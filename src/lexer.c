@@ -31,14 +31,14 @@ Token lexer_next_token(Lexer *lexer) {
     }
 
     token.start = lexer->current;
-    token.length = 0;
+    token.length = 1;
 
     char c = *token.start;
 
     // string lexer
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
         while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) {
-            c = *(token.start + ++token.length);
+            c = *(token.start + token.length++);
         }
 
         if (token.length == 2 && strncmp(token.start, "if", 2) == 0) {
@@ -85,13 +85,15 @@ Token lexer_next_token(Lexer *lexer) {
         return token;
     }
 
-    // literal lexer
+    // number lexer
     if (c >= '0' && c <= '9') {
-        token.type = TOKEN_LITERAL;
+        token.type = TOKEN_INT_LITERAL;
         int dotCount = 0;
-        while ((c >= '0' && c <= '9') || (c == 'b') || (c == '.')) {
-            if (c == 'b') { token.length++; break; }
-            if (c == '.' && !dotCount++) { token.type = TOKEN_ERROR; break; }
+        while ((c >= '0' && c <= '9') || (c == '.')) {
+            if (c == '.') {
+                if (!dotCount++) { token.type = TOKEN_ERROR; break; }
+                token.type = TOKEN_FLOAT;
+            }
             token.length++;
             c = *(token.start + token.length);
         }
@@ -99,8 +101,36 @@ Token lexer_next_token(Lexer *lexer) {
         return token;
     }
 
+    // char lexer
+    if (c == '\'') {
+         // normal char
+        if (lexer->current[1] != '\\') {
+            if (lexer->current[1] == '\0' || lexer->current[2] != '\'') {
+                token.type = TOKEN_ERROR;
+                return token;
+            }
+
+            token.type = TOKEN_CHAR_LITERAL;
+            token.length = 3;
+
+            lexer->current += token.length;
+            return token;
+        }
+
+        // escaped char
+        if (lexer->current[2] == '\0' || lexer->current[3] != '\'') {
+            token.type = TOKEN_ERROR;
+            return token;
+        }
+
+        token.type = TOKEN_CHAR_LITERAL;
+        token.length = 4;
+
+        lexer->current += token.length;
+        return token;
+    }
+
     // punctuation lexer
-    token.length = 1;
     switch (c) {
         case ';': token.type = TOKEN_SEMICOLON; break;
 
@@ -120,8 +150,6 @@ Token lexer_next_token(Lexer *lexer) {
 
         case ',': token.type = TOKEN_COMMA; break;
 
-        case '\'': token.type = TOKEN_APOST; break;
-
         case '+': token.type = TOKEN_PLUS; break;
 
         case '-': token.type = TOKEN_MINUS; break;
@@ -131,7 +159,6 @@ Token lexer_next_token(Lexer *lexer) {
         case '/': {
             token.type = TOKEN_SLASH; break;
         }
-
         case '=': {
             if (lexer->current[1] == '=') {
                 token.type = TOKEN_EQUAL_EQUAL;
@@ -208,7 +235,6 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_SEMICOLON: printf("SEMICOLON"); break;
             case TOKEN_DOT: printf("DOT"); break;
             case TOKEN_COMMA: printf("COMMA"); break;
-            case TOKEN_APOST: printf("APOST"); break;
 
             case TOKEN_PLUS: printf("PLUS"); break;
             case TOKEN_MINUS: printf("MINUS"); break;
@@ -237,7 +263,9 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_WHILE: printf("WHILE"); break;
             case TOKEN_BREAK: printf("BREAK"); break;
 
-            case TOKEN_LITERAL: printf("LITERAL"); break;
+            case TOKEN_INT_LITERAL: printf("INT_LITERAL"); break;
+            case TOKEN_FLOAT_LITERAL: printf("FLOAT_LITERAL"); break;
+            case TOKEN_CHAR_LITERAL: printf("CHAR_LITERAL"); break;
             case TOKEN_TRUE: printf("TRUE"); break;
             case TOKEN_FALSE: printf("FALSE"); break;
             case TOKEN_IDENTIFIER: printf("IDENTIFIER"); break;
