@@ -453,6 +453,7 @@ static AST_Expression *parse_expression(Parser *parser) {
 static AST_Block *parse_statement_or_block(Parser *parser) {
     AST_Block *block = malloc(sizeof(*block));
     if (!block) return NULL;
+    *block = (AST_Block){0};
 
     if (parser->current.type == TOKEN_LEFT_BRACE) {
         parser_next(parser);
@@ -678,6 +679,43 @@ static AST_Node *parse_if_statement(Parser *parser) {
     return node;
 }
 
+static AST_Node *parse_while_statement(Parser *parser) {
+    if (!parser_next(parser)) return NULL; // skip while
+
+    if (!parser_match(parser, TOKEN_LEFT_PAREN)) return NULL;
+
+    AST_Expression *condition = parse_expression(parser);
+    if (!condition) return NULL;
+
+    if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
+        free(condition);
+        return NULL;
+    }
+
+    AST_Block *body = parse_statement_or_block(parser);
+    if (!body) {
+        free(condition);
+        return NULL;
+    }
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(condition);
+        free(body);
+        return NULL;
+    }
+
+    *node = (AST_Node) {
+        .type = AST_WHILE,
+        .loop = (AST_Loop) {
+            .condition = condition,
+            .body = body,
+        },
+    };
+
+    return node;
+}
+
 static AST_Node *parse_statement(Parser *parser) {
     AST_Node *node = NULL;
 
@@ -701,6 +739,10 @@ static AST_Node *parse_statement(Parser *parser) {
 
         case TOKEN_IF:
             node = parse_if_statement(parser);
+            break;
+
+        case TOKEN_WHILE:
+            node = parse_while_statement(parser);
             break;
 
         default: return NULL;
