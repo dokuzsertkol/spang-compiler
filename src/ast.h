@@ -49,6 +49,7 @@ typedef struct {
     const char *name;
     size_t length;
     AST_Location location;
+    AST_Expression *initializer;
 } AST_VariableDeclaration;
 
 // operator

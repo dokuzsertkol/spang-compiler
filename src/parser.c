@@ -225,6 +225,42 @@ static AST_Expression *parse_expression(Parser *parser) {
     return left;
 }
 
+static AST_Node *parse_variable_assignment(Parser *parser, Token identifier) {
+    if(!parser_next(parser)) return NULL; // skip =
+
+    AST_Expression *exp = parse_expression(parser);
+    if (!exp) return NULL;
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(exp);
+        return NULL;
+    }
+
+    AST_Expression *var = malloc(sizeof(*var));
+    if (!var) {
+        free(exp);
+        return NULL;
+    }
+    *var = (AST_Expression){
+        .type = AST_EX_VARIABLE,
+        .variable = (AST_Variable){
+            .name = identifier.start,
+            .length = identifier.length,
+        },
+    };
+
+    *node = (AST_Node){
+        .type = AST_ASSIGNMENT,
+        .assignment = (AST_Assignment){
+            .target = var,
+            .value = exp,
+        }
+    };
+
+    return node;
+}
+
 static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
     if (!parser_match(parser, TOKEN_LEFT_BRACKET)) return NULL;
 
@@ -266,16 +302,34 @@ static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
         return NULL; 
     }
 
+    AST_Expression *initializer = NULL;
+    if (parser->current.type == TOKEN_EQUAL) {
+        if (!parser_next(parser)) {
+            free(loc.offset);
+            free(loc.size);
+            return NULL;
+        }
+
+        initializer = parse_expression(parser);
+        if (!initializer) {
+            free(loc.offset);
+            free(loc.size);
+            return NULL;
+        }
+    }
+
     AST_Node *node = malloc(sizeof(*node));
     if (!node) {
         free(loc.offset);
         free(loc.size);
+        free(initializer);
         return NULL; 
     }
     node->type = AST_VARIABLE_DECLARATION;
     node->variableDeclaration.location = loc;
     node->variableDeclaration.name = identifier.start;
     node->variableDeclaration.length = identifier.length;
+    node->variableDeclaration.initializer = initializer;
 
     return node;
 }
@@ -283,10 +337,12 @@ static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
 static AST_Node *parse_identifier_statement(Parser *parser) {
     Token identifier = parser->current;
 
-    if (!parser_next(parser)) return NULL;
+    if (!parser_next(parser)) return NULL; // skip identifier
 
     switch (parser->current.type) {
         case TOKEN_LEFT_BRACKET: return parse_variable_declaration(parser, identifier);
+
+        case TOKEN_EQUAL: return parse_variable_assignment(parser, identifier);
 
         default: return NULL;
     }

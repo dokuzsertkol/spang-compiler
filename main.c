@@ -5,7 +5,7 @@
 
 
 static const char* get_source() {
-    FILE *input = fopen("./input/main.dk", "r");
+    FILE *input = fopen("./input/main.spg", "r");
 
     if (!input) {
         perror("fopen");
