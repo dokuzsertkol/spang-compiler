@@ -24,7 +24,18 @@ Token lexer_next_token(Lexer *lexer) {
             continue;
         }
         if (lexer->current[0] == '/' && lexer->current[1] == '*') {
-            while (*lexer->current != '\0' || (lexer->current[0] == '*' && lexer->current[1] == '/')) lexer->current++;
+            lexer->current += 2;
+
+            while (*lexer->current != '\0' &&
+                !(lexer->current[0] == '*' &&
+                    lexer->current[1] == '/')) {
+                lexer->current++;
+            }
+
+            if (*lexer->current == '\0') {
+                token.type = TOKEN_ERROR;
+                return token;
+            } else lexer->current += 2;
             continue;
         }
         break;
