@@ -261,46 +261,50 @@ static AST_Node *parse_variable_assignment(Parser *parser, Token identifier) {
     return node;
 }
 
-static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
-    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) return NULL;
+static int parse_location(Parser *parser, AST_Location *loc) {
+    *loc = (AST_Location){0};
 
-    AST_Location loc = {0};
+    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) return 0;
 
     switch (parser->current.type) {
-        case TOKEN_SP: loc.base = AST_LOCATION_SP; break;
-
-        case TOKEN_FP: loc.base = AST_LOCATION_FP; break;
-
-        case TOKEN_BP: loc.base = AST_LOCATION_BP; break;
-
-        case TOKEN_HP: loc.base = AST_LOCATION_HP; break;
-        
-        default: return NULL;
+        case TOKEN_SP: loc->base = AST_LOCATION_SP; break;
+        case TOKEN_FP: loc->base = AST_LOCATION_FP; break;
+        case TOKEN_BP: loc->base = AST_LOCATION_BP; break;
+        case TOKEN_HP: loc->base = AST_LOCATION_HP; break;
+        default: return 0;
     }
-    if (!parser_next(parser)) return NULL; // skip base
 
-    if (parser->current.type == TOKEN_COMMA) loc.offset = NULL;
-    else {
-        loc.offset = parse_expression(parser);
-        if (!loc.offset) return NULL;
+    if (!parser_next(parser)) return 0;
+
+    if (parser->current.type != TOKEN_COMMA) {
+        loc->offset = parse_expression(parser);
+        if (!loc->offset) return 0;
     }
 
     if (!parser_match(parser, TOKEN_COMMA)) {
-        free(loc.offset);
-        return NULL;
+        free(loc->offset);
+        return 0;
     }
 
-    loc.size = parse_expression(parser);
-    if (!loc.size) {
-        free(loc.offset);
-        return NULL;
+    loc->size = parse_expression(parser);
+    if (!loc->size) {
+        free(loc->offset);
+        return 0;
     }
 
     if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
-        free(loc.offset);
-        free(loc.size);
-        return NULL; 
+        free(loc->offset);
+        free(loc->size);
+        return 0;
     }
+
+    return 1;
+}
+
+static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
+    
+    AST_Location loc = {0};
+    if(!parse_location(parser, &loc)) return NULL;
 
     AST_Expression *initializer = NULL;
     if (parser->current.type == TOKEN_EQUAL) {
@@ -348,6 +352,54 @@ static AST_Node *parse_identifier_statement(Parser *parser) {
     }
 }
 
+static AST_Node *parse_location_assignment(Parser *parser) {
+    AST_Location loc = {0};
+    if(!parse_location(parser, &loc)) return NULL;
+
+    if(!parser_match(parser, TOKEN_EQUAL)) {
+        free(loc.offset);
+        free(loc.size);
+        return NULL;
+    }
+
+    AST_Expression *exp = parse_expression(parser);
+    if (!exp) {
+        free(loc.offset);
+        free(loc.size);
+        return NULL;
+    }
+
+    AST_Expression *location = malloc(sizeof(*location));
+    if (!location) {
+        free(loc.offset);
+        free(loc.size);
+        free(exp);
+        return NULL;
+    }
+    *location = (AST_Expression) {
+        .type = AST_EX_LOCATION,
+        .location = loc,
+    };
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(location);
+        free(loc.offset);
+        free(loc.size);
+        return NULL;
+    }
+
+    *node = (AST_Node) {
+        .type = AST_ASSIGNMENT,
+        .assignment = (AST_Assignment) {
+            .target = location,
+            .value = exp,
+        },
+    };
+
+    return node;
+}
+
 static int block_add_statement(AST_Block *block, AST_Node *statement) {
     if (block->count >= block->capacity) {
         int newCapacity = block->capacity == 0 ? 8 : block->capacity * 2;
@@ -370,6 +422,9 @@ static AST_Node *parse_statement(Parser *parser) {
         case TOKEN_IDENTIFIER:
             node = parse_identifier_statement(parser);
             break;
+        
+        case TOKEN_LEFT_BRACKET:
+            node = parse_location_assignment(parser);
 
         default: return NULL;
     }
