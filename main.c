@@ -1,10 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include "src/ast.h"
 #include "src/lexer.h"
 #include "src/parser.h"
-#include "src/semantic_analyser.h"
-#include "src/ir.h"
-#include "src/codegen.h"
 
 
 static const char* get_source() {
@@ -39,6 +37,12 @@ int main() {
 
     Lexer lexer = lexer_init(source);
     lexer_print(&lexer);
+
+    Parser parser = parser_init(&lexer);
+    AST_Program *program = parse_program(&parser);
+    if (!program) {
+        printf("%s", "PARSER ERROR\n");
+    }
 
     /* ASTNode program = parse_program(&lexer);
     ast_print(&program);

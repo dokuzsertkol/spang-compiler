@@ -18,10 +18,10 @@ typedef enum {
 typedef struct {
     AST_DataType type;
     union {
-        long int_value;
-        char char_value;
-        bool bool_value;
-        double float_value;
+        long intValue;
+        char charValue;
+        bool boolValue;
+        double floatValue;
     };
 } AST_Literal;
 
@@ -42,13 +42,13 @@ typedef struct {
 // variable
 typedef struct {
     const char *name;
-    AST_Location location;
+    size_t length;
 } AST_Variable;
 
 typedef struct {
     const char *name;
-    AST_DataType type;
-    AST_Expression *initializer;
+    size_t length;
+    AST_Location location;
 } AST_VariableDeclaration;
 
 // operator
@@ -96,7 +96,7 @@ struct AST_Expression {
         struct {
             AST_Expression *function;
             AST_Expression **arguments;
-            size_t argument_count;
+            size_t argumentCount;
         } call;
     };
 };
@@ -111,8 +111,8 @@ typedef struct {
 // conditional
 typedef struct {
     AST_Expression *condition;
-    AST_Block *then_body;
-    AST_Block *else_body;
+    AST_Block *thenBody;
+    AST_Block *elseBody;
 } AST_Conditional;
 
 // loop
@@ -130,10 +130,10 @@ typedef struct {
 typedef struct {
     const char *name;
 
-    AST_DataType return_type;
+    AST_DataType returnType;
 
     AST_Parameter *parameters;
-    size_t parameter_count;
+    size_t parameterCount;
 
     AST_Block *body;
 } AST_Function;
@@ -150,7 +150,7 @@ typedef struct {
 
 // program
 typedef struct {
-    AST_Block *block;
+    AST_Block block;
 } AST_Program;
 
 // node

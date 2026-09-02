@@ -1,4 +1,5 @@
 #pragma once
+#include <stddef.h>
 
 typedef enum {
     TOKEN_EOF,
@@ -48,10 +49,18 @@ typedef enum {
     TOKEN_TRUE,
     TOKEN_FALSE,
     TOKEN_IDENTIFIER,
+    TOKEN_SP,
+    TOKEN_FP,
+    TOKEN_BP,
+    TOKEN_HP,
 } TokenType;
 
 typedef struct {
     TokenType type;
     const char *start;
-    int length;
+    size_t length;
 } Token;
+
+long token_to_int(const Token *token);
+char token_to_char(const Token *token);
+double token_to_float(const Token *token);

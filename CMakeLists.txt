@@ -7,7 +7,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(spangc
     main.c
+    src/token.c
     src/lexer.c
+    src/parser.c
 )
 
 target_include_directories(spangc PRIVATE src)

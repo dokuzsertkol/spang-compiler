@@ -31,18 +31,30 @@ Token lexer_next_token(Lexer *lexer) {
     }
 
     token.start = lexer->current;
-    token.length = 1;
+    token.length = 0;
 
     char c = *token.start;
 
     // string lexer
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
         while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) {
-            c = *(token.start + token.length++);
+            c = *(token.start + ++token.length);
         }
 
         if (token.length == 2 && strncmp(token.start, "if", 2) == 0) {
             token.type = TOKEN_IF;
+        }
+        else if (token.length == 2 && strncmp(token.start, "sp", 2) == 0) {
+            token.type = TOKEN_SP;
+        }
+        else if (token.length == 2 && strncmp(token.start, "fp", 2) == 0) {
+            token.type = TOKEN_FP;
+        }
+        else if (token.length == 2 && strncmp(token.start, "bp", 2) == 0) {
+            token.type = TOKEN_BP;
+        }
+        else if (token.length == 2 && strncmp(token.start, "hp", 2) == 0) {
+            token.type = TOKEN_HP;
         }
         else if (token.length == 3 && strncmp(token.start, "int", 3) == 0) {
             token.type = TOKEN_INT;
@@ -131,6 +143,7 @@ Token lexer_next_token(Lexer *lexer) {
     }
 
     // punctuation lexer
+    token.length = 1;
     switch (c) {
         case ';': token.type = TOKEN_SEMICOLON; break;
 
@@ -269,11 +282,15 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_TRUE: printf("TRUE"); break;
             case TOKEN_FALSE: printf("FALSE"); break;
             case TOKEN_IDENTIFIER: printf("IDENTIFIER"); break;
+            case TOKEN_SP: printf("SP"); break;
+            case TOKEN_FP: printf("FP"); break;
+            case TOKEN_BP: printf("BP"); break;
+            case TOKEN_HP: printf("HP"); break;
         }
 
         if (token.type != TOKEN_EOF) {
             printf(" \"");
-            printf("%.*s", token.length, token.start);
+            printf("%.*s", (int)token.length, token.start);
             printf("\"");
         }
 

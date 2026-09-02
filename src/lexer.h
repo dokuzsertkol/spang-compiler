@@ -9,8 +9,6 @@ typedef struct {
 
 Lexer lexer_init(const char* source);
 Token lexer_next_token(Lexer* lexer);
-int token_to_int(Token* token);
-char token_to_char(Token* token);
 
 // debug
 void lexer_print(const Lexer *lexer);
