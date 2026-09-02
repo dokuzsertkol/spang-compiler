@@ -59,11 +59,14 @@ typedef enum {
     AST_OP_MULTIPLY,
     AST_OP_DIVIDE,
     AST_OP_EQUAL,
+    AST_OP_NOT,
     AST_OP_NOT_EQUAL,
     AST_OP_LESS,
     AST_OP_LESS_EQUAL,
     AST_OP_GREATER,
     AST_OP_GREATER_EQUAL,
+    AST_OP_AND,
+    AST_OP_OR,
 } AST_OperatorType;
 
 // expression

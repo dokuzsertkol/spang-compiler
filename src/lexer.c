@@ -272,7 +272,7 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_GREATER: printf("GREATER"); break;
             case TOKEN_LESS_EQUAL: printf("LESS_EQUAL"); break;
             case TOKEN_GREATER_EQUAL: printf("GREATER_EQUAL"); break;
-            case TOKEN_AMPERS_AMPERS: printf("LESS"); break;
+            case TOKEN_AMPERS_AMPERS: printf("AMPERS_AMPERS"); break;
             case TOKEN_BAR_BAR: printf("BAR_BAR"); break;
             case TOKEN_EXCLAM: printf("EXCLAM"); break;
 

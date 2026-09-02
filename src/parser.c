@@ -107,7 +107,7 @@ static AST_Expression *parse_primary(Parser *parser) {
 }
 
 static AST_Expression *parse_unary(Parser *parser) {
-    if (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS) {
+    if (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS || parser->current.type == TOKEN_EXCLAM) {
         TokenType op = parser->current.type;
         if (!parser_next(parser)) return NULL;
 
@@ -124,23 +124,20 @@ static AST_Expression *parse_unary(Parser *parser) {
         exp->unary.operand = operand;
 
         switch (op) {
-            case TOKEN_PLUS:
-                exp->unary.op = AST_OP_PLUS;
-                break;
+            case TOKEN_PLUS: exp->unary.op = AST_OP_PLUS; break;
 
-            case TOKEN_MINUS:
-                exp->unary.op = AST_OP_MINUS;
-                break;
+            case TOKEN_MINUS: exp->unary.op = AST_OP_MINUS; break;
 
-            default:
-                break;
+            case TOKEN_EXCLAM: exp->unary.op = AST_OP_NOT; break;
+
+            default: break;
         }
         return exp;
     }
     return parse_primary(parser);
 }
 
-static AST_Expression *parse_term(Parser *parser) {
+static AST_Expression *parse_multiplicative(Parser *parser) {
     AST_Expression *left = parse_unary(parser);
     if (!left) return NULL;
 
@@ -183,8 +180,8 @@ static AST_Expression *parse_term(Parser *parser) {
     return left;
 }
 
-static AST_Expression *parse_expression(Parser *parser) {
-    AST_Expression *left = parse_term(parser);
+static AST_Expression *parse_additive(Parser *parser) {
+    AST_Expression *left = parse_multiplicative(parser);
     if (!left) return NULL;
 
     while (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS) {
@@ -195,7 +192,7 @@ static AST_Expression *parse_expression(Parser *parser) {
             return NULL;
         }
 
-        AST_Expression *right = parse_term(parser);
+        AST_Expression *right = parse_multiplicative(parser);
         if (!right) {
             free(left);
             return NULL;
@@ -223,6 +220,179 @@ static AST_Expression *parse_expression(Parser *parser) {
         left = binary;
     }
     return left;
+}
+
+static AST_Expression *parse_comparison(Parser *parser) {
+    AST_Expression *left = parse_additive(parser);
+    if (!left) return NULL;
+
+    while (parser->current.type == TOKEN_LESS || parser->current.type == TOKEN_GREATER 
+        || parser->current.type == TOKEN_LESS_EQUAL || parser->current.type == TOKEN_GREATER_EQUAL) {
+
+        TokenType op = parser->current.type;
+
+        if (!parser_next(parser)) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *right = parse_additive(parser);
+        if (!right) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *binary = malloc(sizeof(*binary));
+        if (!binary) {
+            free(left);
+            free(right);
+            return NULL;
+        }
+
+        binary->type = AST_EX_BINARY;
+        binary->binary.left = left;
+        binary->binary.right = right;
+
+        switch (op) {
+            case TOKEN_LESS: binary->binary.op = AST_OP_LESS; break;
+
+            case TOKEN_GREATER: binary->binary.op = AST_OP_GREATER; break;
+
+            case TOKEN_LESS_EQUAL: binary->binary.op = AST_OP_LESS_EQUAL; break;
+
+            case TOKEN_GREATER_EQUAL: binary->binary.op = AST_OP_GREATER_EQUAL; break;
+
+            default:
+                free(binary);
+                free(left);
+                free(right);
+                return NULL;
+        }
+
+        left = binary;
+    }
+
+    return left;
+}
+
+static AST_Expression *parse_equality(Parser *parser) {
+    AST_Expression *left = parse_comparison(parser);
+    if (!left) return NULL;
+
+    while (parser->current.type == TOKEN_EQUAL_EQUAL || parser->current.type == TOKEN_NOT_EQUAL) {
+
+        TokenType op = parser->current.type;
+
+        if (!parser_next(parser)) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *right = parse_comparison(parser);
+        if (!right) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *binary = malloc(sizeof(*binary));
+        if (!binary) {
+            free(left);
+            free(right);
+            return NULL;
+        }
+
+        binary->type = AST_EX_BINARY;
+        binary->binary.left = left;
+        binary->binary.right = right;
+
+        switch (op) {
+            case TOKEN_EQUAL_EQUAL: binary->binary.op = AST_OP_EQUAL; break;
+
+            case TOKEN_NOT_EQUAL: binary->binary.op = AST_OP_NOT_EQUAL; break;
+
+            default:
+                free(binary);
+                free(left);
+                free(right);
+                return NULL;
+        }
+
+        left = binary;
+    }
+
+    return left;
+}
+
+static AST_Expression *parse_logical_and(Parser *parser) {
+    AST_Expression *left = parse_equality(parser);
+    if (!left) return NULL;
+
+    while (parser->current.type == TOKEN_AMPERS_AMPERS) {
+        if (!parser_next(parser)) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *right = parse_equality(parser);
+        if (!right) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *binary = malloc(sizeof(*binary));
+        if (!binary) {
+            free(left);
+            free(right);
+            return NULL;
+        }
+
+        binary->type = AST_EX_BINARY;
+        binary->binary.left = left;
+        binary->binary.right = right;
+        binary->binary.op = AST_OP_AND;
+
+        left = binary;
+    }
+
+    return left;
+}
+
+static AST_Expression *parse_logical_or(Parser *parser) {
+    AST_Expression *left = parse_logical_and(parser);
+    if (!left) return NULL;
+
+    while (parser->current.type == TOKEN_BAR_BAR) {
+        if (!parser_next(parser)) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *right = parse_logical_and(parser);
+        if (!right) {
+            free(left);
+            return NULL;
+        }
+
+        AST_Expression *binary = malloc(sizeof(*binary));
+        if (!binary) {
+            free(left);
+            free(right);
+            return NULL;
+        }
+
+        binary->type = AST_EX_BINARY;
+        binary->binary.left = left;
+        binary->binary.right = right;
+        binary->binary.op = AST_OP_OR;
+
+        left = binary;
+    }
+
+    return left;
+}
+
+static AST_Expression *parse_expression(Parser *parser) {
+    return parse_logical_or(parser);
 }
 
 static AST_Node *parse_variable_assignment(Parser *parser, Token identifier) {
