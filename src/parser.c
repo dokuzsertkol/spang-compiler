@@ -513,12 +513,6 @@ static AST_StructField *parse_struct_field(Parser *parser) {
         return NULL;
     }
 
-    if (!parser_match(parser, TOKEN_SEMICOLON)) {
-        free(offset);
-        free(size);
-        return NULL;
-    }
-
     AST_StructField *field = malloc(sizeof(*field));
     if (!field) {
         free(offset);
@@ -772,6 +766,15 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
 
         node->structDeclaration.fields[node->structDeclaration.field_count++] = *field;
         free(field);
+
+        if (parser->current.type == TOKEN_COMMA) {
+            if (!parser_next(parser)) {
+                free(node->structDeclaration.fields);
+                free(node);
+                return NULL;
+            }
+            if (parser->current.type == TOKEN_RIGHT_BRACE) break;
+        } else break;
     }
 
     if (parser->current.type != TOKEN_RIGHT_BRACE) {
