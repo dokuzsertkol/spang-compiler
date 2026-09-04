@@ -51,19 +51,19 @@ typedef struct {
     AST_Expression *initializer;
 } AST_VariableDeclaration;
 
-// struct
-typedef struct AST_StructField {
+typedef struct {
     const char *name;
     size_t length;
     AST_Expression *offset;
     AST_Expression *size;
-} AST_StructField;
+} AST_Field;
 
+// struct
 typedef struct {
     const char *name;
     size_t length;
-    AST_StructField *fields;
-    size_t field_count;
+    AST_Field *fields;
+    size_t fieldCount;
 } AST_StructDeclaration;
 
 // member access
@@ -151,19 +151,15 @@ typedef struct {
 // function
 typedef struct {
     const char *name;
-    AST_DataType type;
-} AST_Parameter;
+    size_t length;
 
-typedef struct {
-    const char *name;
+    AST_Expression *returnSize;
 
-    AST_DataType returnType;
-
-    AST_Parameter *parameters;
+    AST_Field *parameters;
     size_t parameterCount;
 
     AST_Block *body;
-} AST_Function;
+} AST_FunctionDeclaration;
 
 typedef struct {
     AST_Expression *value;
@@ -185,10 +181,11 @@ typedef enum {
     AST_PROGRAM,
     AST_BLOCK,
 
-    AST_FUNCTION,
+    AST_FUNCTION_DECLARATION,
     AST_VARIABLE_DECLARATION,
-    AST_ASSIGNMENT,
     AST_STRUCT_DECLARATION,
+
+    AST_ASSIGNMENT,
 
     AST_IF,
     AST_WHILE,
@@ -204,7 +201,7 @@ struct AST_Node {
         AST_Program program;
         AST_Block block;
 
-        AST_Function function;
+        AST_FunctionDeclaration functionDeclaration;
         AST_Loop loop;
         AST_Conditional conditional;
         AST_Expression expression;
