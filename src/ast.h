@@ -52,6 +52,21 @@ typedef struct {
     AST_Expression *initializer;
 } AST_VariableDeclaration;
 
+// struct
+typedef struct AST_StructField {
+    const char *name;
+    size_t length;
+    AST_Expression *offset;
+    AST_Expression *size;
+} AST_StructField;
+
+typedef struct {
+    const char *name;
+    size_t length;
+    AST_StructField *fields;
+    size_t field_count;
+} AST_StructDeclaration;
+
 // operator
 typedef enum {
     AST_OP_PLUS,
@@ -165,6 +180,7 @@ typedef enum {
     AST_FUNCTION,
     AST_VARIABLE_DECLARATION,
     AST_ASSIGNMENT,
+    AST_STRUCT_DECLARATION,
 
     AST_IF,
     AST_WHILE,
@@ -187,6 +203,7 @@ struct AST_Node {
         AST_Assignment assignment;
         AST_VariableDeclaration variableDeclaration;
         AST_Return returnStatement;
+        AST_StructDeclaration structDeclaration;
     };
 };
 

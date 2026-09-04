@@ -568,6 +568,122 @@ static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
     return node;
 }
 
+static AST_StructField *parse_struct_field(Parser *parser) {
+    if (!parser_match(parser, TOKEN_IDENTIFIER)) return NULL;
+    Token identifier = parser->current;
+
+    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) return NULL;
+
+    AST_Expression *offset = parse_expression(parser);
+    if (!offset) return NULL;
+
+    if (!parser_match(parser, TOKEN_COMMA)) {
+        free(offset);
+        return NULL;
+    }
+
+    AST_Expression *size = parse_expression(parser);
+    if (!size) {
+        free(offset);
+        return NULL;
+    }
+
+    if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
+        free(offset);
+        free(size);
+        return NULL;
+    }
+
+    if (!parser_match(parser, TOKEN_SEMICOLON)) {
+        free(offset);
+        free(size);
+        return NULL;
+    }
+
+    AST_StructField *field = malloc(sizeof(*field));
+    if (!field) {
+        free(offset);
+        free(size);
+        return NULL;
+    }
+
+    *field = (AST_StructField) {
+        .name = identifier.start,
+        .length = identifier.length,
+        .offset = offset,
+        .size = size,
+    };
+
+    return field;
+}
+
+static AST_Node *parse_struct_declaration(Parser *parser) {
+    if (!parser_match(parser, TOKEN_STRUCT)) return NULL;
+
+    if (!parser_match(parser, TOKEN_IDENTIFIER)) return NULL;
+    Token identifier = parser->current;
+
+    if (!parser_match(parser, TOKEN_LEFT_BRACE)) return NULL;
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) return NULL;
+
+    size_t capacity = 8;
+    *node = (AST_Node) {
+        .type = AST_STRUCT_DECLARATION,
+        .structDeclaration = {
+            .name = identifier.start,
+            .length = identifier.length,
+            .fields = NULL,
+            .field_count = 0,
+        },
+    };
+
+    node->structDeclaration.fields = malloc(sizeof(AST_StructField) * capacity);
+    if (!node->structDeclaration.fields) {
+        free(node);
+        return NULL;
+    }
+
+    while (parser->current.type != TOKEN_EOF && parser->current.type != TOKEN_RIGHT_BRACE) {
+        AST_StructField *field = parse_struct_field(parser);
+
+        if (!field) {
+            free(node->structDeclaration.fields);
+            free(node);
+            return NULL;
+        }
+
+        if (node->structDeclaration.field_count >= capacity) {
+            capacity *= 2;
+
+            AST_StructField *fields = realloc(node->structDeclaration.fields, sizeof(AST_StructField) * capacity);
+
+            if (!fields) {
+                free(field);
+                free(node->structDeclaration.fields);
+                free(node);
+                return NULL;
+            }
+
+            node->structDeclaration.fields = fields;
+        }
+
+        node->structDeclaration.fields[node->structDeclaration.field_count++] = *field;
+        free(field);
+    }
+
+    if (parser->current.type != TOKEN_RIGHT_BRACE) {
+        free(node->structDeclaration.fields);
+        free(node);
+        return NULL;
+    }
+
+    parser_match(parser, TOKEN_RIGHT_BRACE);
+
+    return node;
+}
+
 static AST_Node *parse_identifier_statement(Parser *parser) {
     Token identifier = parser->current;
 
@@ -743,6 +859,10 @@ static AST_Node *parse_statement(Parser *parser) {
 
         case TOKEN_WHILE:
             node = parse_while_statement(parser);
+            break;
+
+        case TOKEN_STRUCT:
+            node = parse_struct_declaration(parser);
             break;
 
         default: return NULL;
