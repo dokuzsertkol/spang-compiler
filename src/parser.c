@@ -161,6 +161,43 @@ static AST_Expression *parse_primary(Parser *parser) {
     }
 }
 
+static AST_Expression *parse_postfix(Parser *parser) {
+    AST_Expression *exp = parse_primary(parser);
+    if (!exp) return NULL;
+
+    while (parser->current.type == TOKEN_DOT) {
+        if (!parser_next(parser)) { // skip dot
+            free(exp);
+            return NULL;
+        }
+
+        Token member = parser->current;
+        if (!parser_match(parser, TOKEN_IDENTIFIER)) {
+            free(exp);
+            return NULL;
+        }
+
+        AST_Expression *access = malloc(sizeof(*access));
+        if (!access) {
+            free(exp);
+            return NULL;
+        }
+
+        *access = (AST_Expression) {
+            .type = AST_EX_MEMBER_ACCESS,
+            .memberAccess = {
+                .parent = exp,
+                .name = member.start,
+                .length = member.length,
+            },
+        };
+
+        exp = access;
+    }
+
+    return exp;
+}
+
 static AST_Expression *parse_unary(Parser *parser) {
     if (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS || parser->current.type == TOKEN_EXCLAM) {
         TokenType op = parser->current.type;
@@ -189,7 +226,7 @@ static AST_Expression *parse_unary(Parser *parser) {
         }
         return exp;
     }
-    return parse_primary(parser);
+    return parse_postfix(parser);
 }
 
 static AST_Expression *parse_multiplicative(Parser *parser) {
@@ -450,124 +487,6 @@ static AST_Expression *parse_expression(Parser *parser) {
     return parse_logical_or(parser);
 }
 
-static AST_Block *parse_statement_or_block(Parser *parser) {
-    AST_Block *block = malloc(sizeof(*block));
-    if (!block) return NULL;
-    *block = (AST_Block){0};
-
-    if (parser->current.type == TOKEN_LEFT_BRACE) {
-        parser_next(parser);
-
-        while (parser->current.type != TOKEN_RIGHT_BRACE && parser->current.type != TOKEN_EOF) {
-
-            AST_Node *statement = parse_statement(parser);
-            if (!statement) {
-                free(block);
-                return NULL;
-            }
-
-            if (!block_add_statement(block, statement)) {
-                free(statement);
-                free(block);
-                return NULL;
-            }
-        }
-
-        if (!parser_match(parser, TOKEN_RIGHT_BRACE)) {
-            free(block);
-            return NULL;
-        }
-    }
-    else {
-        AST_Node *statement = parse_statement(parser);
-        if (!statement) {
-            free(block);
-            return NULL;
-        }
-
-        if (!block_add_statement(block, statement)) {
-            free(statement);
-            free(block);
-            return NULL;
-        }
-    }
-
-    return block;
-}
-
-static AST_Node *parse_variable_assignment(Parser *parser, Token identifier) {
-    if(!parser_next(parser)) return NULL; // skip =
-
-    AST_Expression *exp = parse_expression(parser);
-    if (!exp) return NULL;
-
-    AST_Node *node = malloc(sizeof(*node));
-    if (!node) {
-        free(exp);
-        return NULL;
-    }
-
-    AST_Expression *var = malloc(sizeof(*var));
-    if (!var) {
-        free(exp);
-        return NULL;
-    }
-    *var = (AST_Expression){
-        .type = AST_EX_VARIABLE,
-        .variable = (AST_Variable){
-            .name = identifier.start,
-            .length = identifier.length,
-        },
-    };
-
-    *node = (AST_Node){
-        .type = AST_ASSIGNMENT,
-        .assignment = (AST_Assignment){
-            .target = var,
-            .value = exp,
-        }
-    };
-
-    return node;
-}
-
-static AST_Node *parse_variable_declaration(Parser *parser, Token identifier) {
-    
-    AST_Location loc = {0};
-    if(!parse_location(parser, &loc)) return NULL;
-
-    AST_Expression *initializer = NULL;
-    if (parser->current.type == TOKEN_EQUAL) {
-        if (!parser_next(parser)) {
-            free(loc.offset);
-            free(loc.size);
-            return NULL;
-        }
-
-        initializer = parse_expression(parser);
-        if (!initializer) {
-            free(loc.offset);
-            free(loc.size);
-            return NULL;
-        }
-    }
-
-    AST_Node *node = malloc(sizeof(*node));
-    if (!node) {
-        free(loc.offset);
-        free(loc.size);
-        free(initializer);
-        return NULL; 
-    }
-    node->type = AST_VARIABLE_DECLARATION;
-    node->variableDeclaration.location = loc;
-    node->variableDeclaration.name = identifier.start;
-    node->variableDeclaration.length = identifier.length;
-    node->variableDeclaration.initializer = initializer;
-
-    return node;
-}
-
 static AST_StructField *parse_struct_field(Parser *parser) {
     if (!parser_match(parser, TOKEN_IDENTIFIER)) return NULL;
     Token identifier = parser->current;
@@ -615,6 +534,188 @@ static AST_StructField *parse_struct_field(Parser *parser) {
     };
 
     return field;
+}
+
+static AST_Block *parse_statement_or_block(Parser *parser) {
+    AST_Block *block = malloc(sizeof(*block));
+    if (!block) return NULL;
+    *block = (AST_Block){0};
+
+    if (parser->current.type == TOKEN_LEFT_BRACE) {
+        parser_next(parser);
+
+        while (parser->current.type != TOKEN_RIGHT_BRACE && parser->current.type != TOKEN_EOF) {
+
+            AST_Node *statement = parse_statement(parser);
+            if (!statement) {
+                free(block);
+                return NULL;
+            }
+
+            if (!block_add_statement(block, statement)) {
+                free(statement);
+                free(block);
+                return NULL;
+            }
+        }
+
+        if (!parser_match(parser, TOKEN_RIGHT_BRACE)) {
+            free(block);
+            return NULL;
+        }
+    }
+    else {
+        AST_Node *statement = parse_statement(parser);
+        if (!statement) {
+            free(block);
+            return NULL;
+        }
+
+        if (!block_add_statement(block, statement)) {
+            free(statement);
+            free(block);
+            return NULL;
+        }
+    }
+
+    return block;
+}
+
+static AST_Node *parse_variable_assignment(Parser *parser, AST_Expression *target) {
+    if(!parser_next(parser)) { // skip =
+        free(target);
+        return NULL;
+    }
+
+    AST_Expression *exp = parse_expression(parser);
+    if (!exp) {
+        free(target);
+        return NULL;
+    }
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(target);
+        free(exp);
+        return NULL;
+    }
+
+    *node = (AST_Node){
+        .type = AST_ASSIGNMENT,
+        .assignment = (AST_Assignment){
+            .target = target,
+            .value = exp,
+        }
+    };
+
+    return node;
+}
+
+static AST_Node *parse_variable_declaration(Parser *parser, AST_Expression *target) {
+    if (target->type != AST_EX_VARIABLE) {
+        free(target);
+        return NULL; 
+    }
+
+    AST_Location loc = {0};
+    if(!parse_location(parser, &loc)) {
+        free(target);
+        return NULL;
+    }
+
+    AST_Expression *initializer = NULL;
+    if (parser->current.type == TOKEN_EQUAL) {
+        if (!parser_next(parser)) {
+            free(target);
+            free(loc.offset);
+            free(loc.size);
+            return NULL;
+        }
+
+        initializer = parse_expression(parser);
+        if (!initializer) {
+            free(target);
+            free(loc.offset);
+            free(loc.size);
+            return NULL;
+        }
+    }
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(target);
+        free(loc.offset);
+        free(loc.size);
+        free(initializer);
+        return NULL; 
+    }
+    node->type = AST_VARIABLE_DECLARATION;
+    node->variableDeclaration.location = loc;
+    node->variableDeclaration.var = target->variable;
+    node->variableDeclaration.initializer = initializer;
+
+    free(target);
+    return node;
+}
+
+static AST_Node *parse_identifier_statement(Parser *parser) {
+    AST_Expression *target = parse_postfix(parser);
+    if (!target) return NULL;
+
+    switch (parser->current.type) {
+        case TOKEN_LEFT_BRACKET: return parse_variable_declaration(parser, target);
+
+        case TOKEN_EQUAL: return parse_variable_assignment(parser, target);
+
+        default: free(target); return NULL;
+    }
+}
+
+static AST_Node *parse_location_assignment(Parser *parser) {
+    AST_Location loc = {0};
+    if(!parse_location(parser, &loc)) return NULL;
+
+    if(!parser_match(parser, TOKEN_EQUAL)) {
+        free(loc.offset);
+        free(loc.size);
+        return NULL;
+    }
+
+    AST_Expression *exp = parse_expression(parser);
+    if (!exp) {
+        free(loc.offset);
+        free(loc.size);
+        return NULL;
+    }
+
+    AST_Expression *location = malloc(sizeof(*location));
+    if (!location) {
+        free(loc.offset);
+        free(loc.size);
+        free(exp);
+        return NULL;
+    }
+    *location = (AST_Expression) {
+        .type = AST_EX_LOCATION,
+        .location = loc,
+    };
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(location);
+        free(loc.offset);
+        free(loc.size);
+        return NULL;
+    }
+    *node = (AST_Node) {
+        .type = AST_ASSIGNMENT,
+        .assignment = (AST_Assignment) {
+            .target = location,
+            .value = exp,
+        },
+    };
+
+    return node;
 }
 
 static AST_Node *parse_struct_declaration(Parser *parser) {
@@ -680,68 +781,6 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
     }
 
     parser_match(parser, TOKEN_RIGHT_BRACE);
-
-    return node;
-}
-
-static AST_Node *parse_identifier_statement(Parser *parser) {
-    Token identifier = parser->current;
-
-    if (!parser_next(parser)) return NULL; // skip identifier
-
-    switch (parser->current.type) {
-        case TOKEN_LEFT_BRACKET: return parse_variable_declaration(parser, identifier);
-
-        case TOKEN_EQUAL: return parse_variable_assignment(parser, identifier);
-
-        default: return NULL;
-    }
-}
-
-static AST_Node *parse_location_assignment(Parser *parser) {
-    AST_Location loc = {0};
-    if(!parse_location(parser, &loc)) return NULL;
-
-    if(!parser_match(parser, TOKEN_EQUAL)) {
-        free(loc.offset);
-        free(loc.size);
-        return NULL;
-    }
-
-    AST_Expression *exp = parse_expression(parser);
-    if (!exp) {
-        free(loc.offset);
-        free(loc.size);
-        return NULL;
-    }
-
-    AST_Expression *location = malloc(sizeof(*location));
-    if (!location) {
-        free(loc.offset);
-        free(loc.size);
-        free(exp);
-        return NULL;
-    }
-    *location = (AST_Expression) {
-        .type = AST_EX_LOCATION,
-        .location = loc,
-    };
-
-    AST_Node *node = malloc(sizeof(*node));
-    if (!node) {
-        free(location);
-        free(loc.offset);
-        free(loc.size);
-        return NULL;
-    }
-
-    *node = (AST_Node) {
-        .type = AST_ASSIGNMENT,
-        .assignment = (AST_Assignment) {
-            .target = location,
-            .value = exp,
-        },
-    };
 
     return node;
 }
@@ -847,11 +886,11 @@ static AST_Node *parse_statement(Parser *parser) {
         
         case TOKEN_LEFT_BRACKET:
             node = parse_location_assignment(parser);
-
             if (!parser_match(parser, TOKEN_SEMICOLON)) {
                 free(node);
                 return NULL;
             }
+            break;
 
         case TOKEN_IF:
             node = parse_if_statement(parser);

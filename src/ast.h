@@ -46,8 +46,7 @@ typedef struct {
 } AST_Variable;
 
 typedef struct {
-    const char *name;
-    size_t length;
+    AST_Variable var;
     AST_Location location;
     AST_Expression *initializer;
 } AST_VariableDeclaration;
@@ -66,6 +65,13 @@ typedef struct {
     AST_StructField *fields;
     size_t field_count;
 } AST_StructDeclaration;
+
+// member access
+typedef struct {
+    AST_Expression *parent;
+    const char *name;
+    size_t length;
+} AST_MemberAccess;
 
 // operator
 typedef enum {
@@ -92,6 +98,7 @@ typedef enum {
     AST_EX_BINARY,
     AST_EX_CALL,
     AST_EX_UNARY,
+    AST_EX_MEMBER_ACCESS,
 } AST_ExpressionType;
 
 struct AST_Expression {
@@ -100,6 +107,7 @@ struct AST_Expression {
         AST_Literal literal;
         AST_Location location;
         AST_Variable variable;
+        AST_MemberAccess memberAccess;
 
         struct {
             AST_Expression *operand;
