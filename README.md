@@ -61,7 +61,6 @@ The base can be:
 - sp: stack pointer
 - fp: function pointer / current frame pointer
 - hp: heap pointer
-- bp: if used by the project later, it is treated as another base reference
 
 The important point is that every memory location is a view into a byte region, and that region can be assigned to or read from directly.
 
@@ -134,9 +133,8 @@ It is treated as a read-mostly frame reference, and it is only meaningful within
 Typical usage:
 
 ```
-fp foo {
-    param1 [fp+4, int];
-    param2 [fp+4, 4];
+fp foo (param1 [0, int], param2 [4, 4]) [int] {
+    ...
 }
 ```
 
@@ -218,10 +216,7 @@ sp base+offset;
 ### Function declaration
 
 ```
-fp foo {
-    param1 [fp+4, int];
-    param2 [fp+4, 4];
-
+fp foo (param1 [0, int], param2 [4, 4]) [int] {
     // locals are also frame-relative
     // fp-offset, size for local memory
 }
@@ -231,8 +226,8 @@ fp foo {
 
 ```
 struct mystruct {
-    x [offset, size];
-    y [offset, size];
+    x [offset, size],
+    y [offset, size],
 }
 ```
 
@@ -301,18 +296,18 @@ while (elma == 1) {
 And another sample uses pointer-style local and global memory layout:
 
 ```
-int foo(int, int elma) {
-    [fp-30, int] = [fp, int] + 4 + elma + kavun;
+fp foo (p1 [0, int], p2 [4, 4]) [int] {
+    [fp-30, int] = [fp, int] + p2;
     return [fp-30, int];
 }
 
-int main() {
+fp main() [int] {
     elma [fp, int];
     armut [sp, int];
     [hp-12, int] = 5;
     kavun [hp-12, int];
     [fp-48, int] = foo(karpuz, [fp-40, int]);
-    return [fp-48, char];
+    return [fp-48, int];
 }
 ```
 
