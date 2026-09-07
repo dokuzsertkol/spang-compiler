@@ -161,41 +161,132 @@ static AST_Expression *parse_primary(Parser *parser) {
     }
 }
 
+static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) {
+    if (!parser_match(parser, TOKEN_DOT)) {
+        free(exp);
+        return NULL;
+    }
+
+    Token member = parser->current;
+
+    if (!parser_match(parser, TOKEN_IDENTIFIER)) {
+        free(exp);
+        return NULL;
+    }
+
+    AST_Expression *access = malloc(sizeof(*access));
+    if (!access) {
+        free(exp);
+        return NULL;
+    }
+
+    *access = (AST_Expression){
+        .type = AST_EX_MEMBER_ACCESS,
+        .memberAccess = {
+            .parent = exp,
+            .name = member.start,
+            .length = member.length,
+        },
+    };
+
+    return access;
+}
+
+static AST_Expression *parse_function_call(Parser *parser, AST_Expression *exp) {
+    if (exp->type != AST_EX_VARIABLE) {
+        free(exp);
+        return NULL;
+    }
+
+    if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
+        free(exp);
+        return NULL;
+    }
+
+    AST_Expression *func = malloc(sizeof(*func));
+    if (!func) {
+        free(exp);
+        return NULL;
+    }
+    *func = (AST_Expression){
+        .type = AST_EX_FUNCTION_CALL,
+        .functionCall = (AST_FunctionCall) {
+            .name = exp->variable.name,
+            .length = exp->variable.length,
+            .arguments = NULL,
+            .argumentCount = 0,
+        },
+    };
+    free(exp);
+
+    // arguments
+    size_t capacity = 8;
+    func->functionCall.arguments = malloc(sizeof(AST_Expression) * capacity);
+    if (!func->functionCall.arguments) {
+        free(func);
+        return NULL;
+    }
+
+    while(parser->current.type != TOKEN_RIGHT_PAREN && parser->current.type != TOKEN_EOF) {
+        AST_Expression *arg = parse_expression(parser);
+        if (!arg) {
+            free(func->functionCall.arguments);
+            free(func);
+            return NULL;
+        }
+
+        if (func->functionCall.argumentCount >= capacity) {
+            capacity *= 2;
+
+            AST_Expression *args = realloc(func->functionCall.arguments, sizeof(AST_Expression) * capacity);
+            if (!args) {
+                free(arg);
+                free(func->functionCall.arguments);
+                free(func);
+                return NULL;
+            }
+
+            func->functionCall.arguments = args;
+        }
+
+        func->functionCall.arguments[func->functionCall.argumentCount++] = *arg;
+        free(arg);
+
+        if (parser->current.type == TOKEN_COMMA) {
+            if (!parser_next(parser) || parser->current.type == TOKEN_RIGHT_PAREN) {
+                free(func->functionCall.arguments);
+                free(func);
+                return NULL;
+            }
+        } else break;
+    }
+
+    if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
+        free(func->functionCall.arguments);
+        free(func);
+        return NULL;
+    }
+    
+    return func;
+}
+
 static AST_Expression *parse_postfix(Parser *parser) {
     AST_Expression *exp = parse_primary(parser);
     if (!exp) return NULL;
 
-    while (parser->current.type == TOKEN_DOT) {
-        if (!parser_next(parser)) { // skip dot
-            free(exp);
-            return NULL;
+    while (1) {
+        switch (parser->current.type) {
+            case TOKEN_LEFT_PAREN:
+                exp = parse_function_call(parser, exp);
+                if (!exp) return NULL; break;
+
+            case TOKEN_DOT:
+                exp = parse_member_access(parser, exp);
+                if (!exp) return NULL; break;
+
+            default: return exp;
         }
-
-        Token member = parser->current;
-        if (!parser_match(parser, TOKEN_IDENTIFIER)) {
-            free(exp);
-            return NULL;
-        }
-
-        AST_Expression *access = malloc(sizeof(*access));
-        if (!access) {
-            free(exp);
-            return NULL;
-        }
-
-        *access = (AST_Expression) {
-            .type = AST_EX_MEMBER_ACCESS,
-            .memberAccess = {
-                .parent = exp,
-                .name = member.start,
-                .length = member.length,
-            },
-        };
-
-        exp = access;
     }
-
-    return exp;
 }
 
 static AST_Expression *parse_unary(Parser *parser) {
@@ -661,6 +752,23 @@ static AST_Node *parse_identifier_statement(Parser *parser) {
 
         case TOKEN_EQUAL: return parse_variable_assignment(parser, target);
 
+        case TOKEN_SEMICOLON: {
+            AST_Node *node = malloc(sizeof(*node));
+            if (!node) {
+                free(target);
+                return NULL;
+            }
+
+            *node = (AST_Node){
+                .type = AST_EXPRESSION_STATEMENT,
+                .expressionStatement = {
+                    .expression = target,
+                },
+            };
+
+            return node;
+        }
+
         default: free(target); return NULL;
     }
 }
@@ -816,9 +924,8 @@ static AST_Node *parse_function_declaration(Parser *parser) {
         return NULL;
     }
 
-    while (parser->current.type != TOKEN_EOF && parser->current.type != TOKEN_RIGHT_PAREN) {
+    while (parser->current.type != TOKEN_RIGHT_PAREN && parser->current.type != TOKEN_EOF) {
         AST_Field *field = parse_field(parser);
-
         if (!field) {
             free(node->functionDeclaration.parameters);
             free(node);
@@ -829,7 +936,6 @@ static AST_Node *parse_function_declaration(Parser *parser) {
             capacity *= 2;
 
             AST_Field *fields = realloc(node->functionDeclaration.parameters, sizeof(AST_Field) * capacity);
-
             if (!fields) {
                 free(field);
                 free(node->functionDeclaration.parameters);
@@ -844,12 +950,11 @@ static AST_Node *parse_function_declaration(Parser *parser) {
         free(field);
 
         if (parser->current.type == TOKEN_COMMA) {
-            if (!parser_next(parser)) {
+            if (!parser_next(parser) || parser->current.type == TOKEN_RIGHT_PAREN) {
                 free(node->functionDeclaration.parameters);
                 free(node);
                 return NULL;
             }
-            if (parser->current.type == TOKEN_RIGHT_PAREN) break;
         } else break;
     }
 

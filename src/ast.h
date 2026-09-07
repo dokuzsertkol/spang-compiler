@@ -73,6 +73,34 @@ typedef struct {
     size_t length;
 } AST_MemberAccess;
 
+// block
+typedef struct {
+    AST_Node **statements;
+    size_t capacity;
+    size_t count;
+} AST_Block;
+
+// function
+typedef struct {
+    const char *name;
+    size_t length;
+
+    AST_Expression *returnSize;
+
+    AST_Field *parameters;
+    size_t parameterCount;
+
+    AST_Block *body;
+} AST_FunctionDeclaration;
+
+typedef struct {
+    const char *name;
+    size_t length;
+
+    AST_Expression *arguments;
+    size_t argumentCount;
+} AST_FunctionCall;
+
 // operator
 typedef enum {
     AST_OP_PLUS,
@@ -99,6 +127,7 @@ typedef enum {
     AST_EX_CALL,
     AST_EX_UNARY,
     AST_EX_MEMBER_ACCESS,
+    AST_EX_FUNCTION_CALL,
 } AST_ExpressionType;
 
 struct AST_Expression {
@@ -108,6 +137,7 @@ struct AST_Expression {
         AST_Location location;
         AST_Variable variable;
         AST_MemberAccess memberAccess;
+        AST_FunctionCall functionCall;
 
         struct {
             AST_Expression *operand;
@@ -128,12 +158,9 @@ struct AST_Expression {
     };
 };
 
-// block
 typedef struct {
-    AST_Node **statements;
-    size_t capacity;
-    size_t count;
-} AST_Block;
+    AST_Expression *expression;
+} AST_ExpressionStatement;
 
 // conditional
 typedef struct {
@@ -147,19 +174,6 @@ typedef struct {
     AST_Expression *condition;
     AST_Block *body;
 } AST_Loop;
-
-// function
-typedef struct {
-    const char *name;
-    size_t length;
-
-    AST_Expression *returnSize;
-
-    AST_Field *parameters;
-    size_t parameterCount;
-
-    AST_Block *body;
-} AST_FunctionDeclaration;
 
 typedef struct {
     AST_Expression *value;
@@ -186,6 +200,7 @@ typedef enum {
     AST_STRUCT_DECLARATION,
 
     AST_ASSIGNMENT,
+    AST_EXPRESSION_STATEMENT,
 
     AST_IF,
     AST_WHILE,
@@ -205,6 +220,7 @@ struct AST_Node {
         AST_Loop loop;
         AST_Conditional conditional;
         AST_Expression expression;
+        AST_ExpressionStatement expressionStatement;
         AST_Assignment assignment;
         AST_VariableDeclaration variableDeclaration;
         AST_Return returnStatement;
