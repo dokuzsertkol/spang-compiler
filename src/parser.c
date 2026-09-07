@@ -997,6 +997,36 @@ static AST_Node *parse_function_declaration(Parser *parser) {
     return node;
 }
 
+static AST_Node *parse_return(Parser *parser) {
+    if(!parser_match(parser, TOKEN_RETURN)) return NULL;
+
+    AST_Expression *value = NULL;
+
+    if (parser->current.type != TOKEN_SEMICOLON) {
+        value = parse_expression(parser);
+        if (!value) return NULL;
+    }
+
+    if (!parser_match(parser, TOKEN_SEMICOLON)) {
+        free(value);
+        return NULL;
+    }
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(value);
+        return NULL;
+    }
+
+    *node = (AST_Node){
+        .type = AST_RETURN,
+        .returnStatement = {
+            .value = value,
+        },
+    };
+    return node;
+}
+
 static AST_Node *parse_if_statement(Parser *parser) {
     if (!parser_next(parser)) return NULL; // skip if
 
@@ -1117,6 +1147,10 @@ static AST_Node *parse_statement(Parser *parser) {
         
         case TOKEN_FP:
             node = parse_function_declaration(parser);
+            break;
+
+        case TOKEN_RETURN:
+            node = parse_return(parser);
             break;
 
         default: return NULL;
