@@ -206,6 +206,7 @@ typedef enum {
     AST_WHILE,
     AST_RETURN,
     AST_BREAK,
+    AST_CONTINUE,
 
     AST_END,
 } AST_NodeType;

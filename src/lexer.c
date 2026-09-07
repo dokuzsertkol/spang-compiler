@@ -103,6 +103,9 @@ Token lexer_next_token(Lexer *lexer) {
         else if (token.length == 6 && strncmp(token.start, "struct", 6) == 0) {
             token.type = TOKEN_STRUCT;
         }
+        else if (token.length == 8 && strncmp(token.start, "continue", 8) == 0) {
+            token.type = TOKEN_CONTINUE;
+        }
         else {
             token.type = TOKEN_IDENTIFIER;
         }
@@ -289,6 +292,7 @@ void lexer_print(const Lexer *lexer) {
             case TOKEN_ELSE: printf("ELSE"); break;
             case TOKEN_WHILE: printf("WHILE"); break;
             case TOKEN_BREAK: printf("BREAK"); break;
+            case TOKEN_CONTINUE: printf("CONTINUE"); break;
             case TOKEN_STRUCT: printf("STRUCT"); break;
 
             case TOKEN_INT_LITERAL: printf("INT_LITERAL"); break;
