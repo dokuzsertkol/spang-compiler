@@ -1,6 +1,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct AST_Node AST_Node;
 typedef struct AST_Expression AST_Expression;
@@ -8,20 +9,33 @@ typedef struct AST_Expression AST_Expression;
 // data type
 typedef enum {
     AST_DATA_INT,
-    AST_DATA_CHAR,
-    AST_DATA_BOOL,
     AST_DATA_FLOAT,
+    AST_DATA_BOOL,
     AST_DATA_VOID,
+    AST_DATA_C1,
+    AST_DATA_C2,
+    AST_DATA_C4,
+    AST_DATA_S1,
+    AST_DATA_S2,
+    AST_DATA_S4,
 } AST_DataType;
 
 // literal
 typedef struct {
     AST_DataType type;
+    size_t length;
     union {
-        long intValue;
-        char charValue;
-        bool boolValue;
+        uint64_t intValue;
         double floatValue;
+        bool boolValue;
+
+        uint8_t c1Value;
+        uint16_t c2Value;
+        uint32_t c4Value;
+
+        uint8_t *s1Value;
+        uint16_t *s2Value;
+        uint32_t *s4Value;
     };
 } AST_Literal;
 

@@ -80,6 +80,7 @@ static AST_Expression *parse_literal(Parser *parser) {
     if (!exp) return NULL;
 
     exp->type = AST_EX_LITERAL;
+    exp->literal.length = 0;
 
     switch (parser->current.type) {
         case TOKEN_INT_LITERAL:
@@ -87,24 +88,61 @@ static AST_Expression *parse_literal(Parser *parser) {
             exp->literal.intValue = token_to_int(&parser->current);
             break;
 
-        case TOKEN_CHAR_LITERAL:
-            exp->literal.type = AST_DATA_CHAR;
-            exp->literal.charValue = token_to_char(&parser->current);
-            break;
-
         case TOKEN_FLOAT_LITERAL:
             exp->literal.type = AST_DATA_FLOAT;
             exp->literal.floatValue = token_to_float(&parser->current);
             break;
 
-        case TOKEN_TRUE:
+        case TOKEN_TRUE: case TOKEN_FALSE:
             exp->literal.type = AST_DATA_BOOL;
-            exp->literal.boolValue = 1;
+            exp->literal.boolValue = parser->current.type == TOKEN_TRUE;
             break;
-        
-        case TOKEN_FALSE:
-            exp->literal.type = AST_DATA_BOOL;
-            exp->literal.boolValue = 0;
+
+        case TOKEN_C1_LITERAL:
+            exp->literal.type = AST_DATA_C1;
+            if(!token_to_c1(&parser->current, &exp->literal.c1Value)) {
+                free(exp);
+                return NULL;
+            }
+            break;
+        case TOKEN_C2_LITERAL:
+            exp->literal.type = AST_DATA_C2;
+            if(!token_to_c2(&parser->current, &exp->literal.c2Value)) {
+                free(exp);
+                return NULL;
+            }
+            break;
+        case TOKEN_C4_LITERAL:
+            exp->literal.type = AST_DATA_C4;
+            if(!token_to_c4(&parser->current, &exp->literal.c4Value)) {
+                free(exp);
+                return NULL;
+            }
+            break;
+
+        case TOKEN_S1_LITERAL:
+            exp->literal.type = AST_DATA_S1;
+            exp->literal.s1Value = token_to_s1(&parser->current, &exp->literal.length);
+            if (!exp->literal.s1Value) {
+                free(exp);
+                return NULL;
+            }
+            break;
+        case TOKEN_S2_LITERAL:
+            exp->literal.type = AST_DATA_S2;
+            exp->literal.s2Value = token_to_s2(&parser->current, &exp->literal.length);
+            if (!exp->literal.s2Value) {
+                free(exp);
+                return NULL;
+            }
+            break;
+        case TOKEN_S4_LITERAL:
+            exp->literal.type = AST_DATA_S4;
+            exp->literal.s4Value = token_to_s4(&parser->current, &exp->literal.length);
+            if (!exp->literal.s4Value) {
+                free(exp);
+                return NULL;
+            }
             break;
 
         default:
@@ -150,13 +188,19 @@ static AST_Expression *parse_parenthesized(Parser *parser) {
 
 static AST_Expression *parse_primary(Parser *parser) {
     switch (parser->current.type) {
-        case TOKEN_INT_LITERAL: case TOKEN_FLOAT_LITERAL: case TOKEN_CHAR_LITERAL: case TOKEN_TRUE: case TOKEN_FALSE:
+        case TOKEN_INT_LITERAL: case TOKEN_FLOAT_LITERAL: case TOKEN_TRUE: case TOKEN_FALSE:
+        case TOKEN_C1_LITERAL: case TOKEN_C2_LITERAL: case TOKEN_C4_LITERAL: 
+        case TOKEN_S1_LITERAL: case TOKEN_S2_LITERAL: case TOKEN_S4_LITERAL:
             return parse_literal(parser);
 
         case TOKEN_IDENTIFIER: return parse_identifier(parser);
 
         case TOKEN_LEFT_PAREN: return parse_parenthesized(parser);
 
+        /*case TOKEN_I1: case TOKEN_I2: case TOKEN_I4: case TOKEN_I8: case TOKEN_U1: case TOKEN_U2: case TOKEN_U4: case TOKEN_U8:
+        case TOKEN_C1: case TOKEN_C2: case TOKEN_C4: case TOKEN_F4: case TOKEN_F8: case TOKEN_B1: case TOKEN_V0:
+            return parse_datatype(parser);*/
+    
         default: return NULL;
     }
 }
