@@ -6,23 +6,21 @@
 typedef struct AST_Node AST_Node;
 typedef struct AST_Expression AST_Expression;
 
-// data type
-typedef enum {
-    AST_DATA_INT,
-    AST_DATA_FLOAT,
-    AST_DATA_BOOL,
-    AST_DATA_VOID,
-    AST_DATA_C1,
-    AST_DATA_C2,
-    AST_DATA_C4,
-    AST_DATA_S1,
-    AST_DATA_S2,
-    AST_DATA_S4,
-} AST_DataType;
-
 // literal
+typedef enum {
+    AST_LITERAL_INT,
+    AST_LITERAL_FLOAT,
+    AST_LITERAL_BOOL,
+    AST_LITERAL_C1,
+    AST_LITERAL_C2,
+    AST_LITERAL_C4,
+    AST_LITERAL_S1,
+    AST_LITERAL_S2,
+    AST_LITERAL_S4,
+} AST_LiteralType;
+
 typedef struct {
-    AST_DataType type;
+    AST_LiteralType type;
     size_t length;
     union {
         uint64_t intValue;
@@ -39,16 +37,16 @@ typedef struct {
     };
 } AST_Literal;
 
-// adress
+// location
 typedef enum {
     AST_LOCATION_SP,
     AST_LOCATION_FP,
     AST_LOCATION_HP,
     AST_LOCATION_BP,
-} AST_LocationType;
+} AST_BaseType;
 
 typedef struct {
-    AST_LocationType base;
+    AST_BaseType base;
     AST_Expression *offset;
     AST_Expression *size;
 } AST_Location;
@@ -65,6 +63,7 @@ typedef struct {
     AST_Expression *initializer;
 } AST_VariableDeclaration;
 
+// field
 typedef struct {
     const char *name;
     size_t length;
@@ -82,9 +81,9 @@ typedef struct {
 
 // member access
 typedef struct {
-    AST_Expression *parent;
     const char *name;
     size_t length;
+    AST_Expression *parent;
 } AST_MemberAccess;
 
 // block
@@ -106,14 +105,6 @@ typedef struct {
 
     AST_Block *body;
 } AST_FunctionDeclaration;
-
-typedef struct {
-    const char *name;
-    size_t length;
-
-    AST_Expression *arguments;
-    size_t argumentCount;
-} AST_FunctionCall;
 
 // operator
 typedef enum {
@@ -141,7 +132,7 @@ typedef enum {
     AST_EX_CALL,
     AST_EX_UNARY,
     AST_EX_MEMBER_ACCESS,
-    AST_EX_FUNCTION_CALL,
+    AST_EX_DATA_TYPE,
 } AST_ExpressionType;
 
 struct AST_Expression {
@@ -151,7 +142,6 @@ struct AST_Expression {
         AST_Location location;
         AST_Variable variable;
         AST_MemberAccess memberAccess;
-        AST_FunctionCall functionCall;
 
         struct {
             AST_Expression *operand;
@@ -201,13 +191,14 @@ typedef struct {
 
 // program
 typedef struct {
-    AST_Block block;
+    AST_Node **statements;
+    size_t capacity;
+    size_t count;
 } AST_Program;
 
 // node
 typedef enum {
     AST_PROGRAM,
-    AST_BLOCK,
 
     AST_FUNCTION_DECLARATION,
     AST_VARIABLE_DECLARATION,
@@ -229,7 +220,6 @@ struct AST_Node {
     AST_NodeType type;
     union {
         AST_Program program;
-        AST_Block block;
 
         AST_FunctionDeclaration functionDeclaration;
         AST_Loop loop;
@@ -243,5 +233,10 @@ struct AST_Node {
     };
 };
 
-//debug
-void ast_print(const AST_Program *program);
+void ast_expression_free(AST_Expression *exp);
+void ast_field_free(AST_Field *fields, size_t count);
+void ast_block_free(AST_Block *block);
+void ast_program_free(AST_Program *block);
+void ast_node_free(AST_Node *node);
+int block_add_statement(AST_Block *block, AST_Node *statement);
+int program_add_statement(AST_Program *program, AST_Node *statement);
