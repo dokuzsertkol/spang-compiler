@@ -49,6 +49,7 @@ typedef struct {
     AST_BaseType base;
     AST_Expression *offset;
     AST_Expression *size;
+    AST_Expression *readAs;
 } AST_Location;
 
 // variable
@@ -69,6 +70,7 @@ typedef struct {
     size_t length;
     AST_Expression *offset;
     AST_Expression *size;
+    AST_Expression *readAs;
 } AST_Field;
 
 // struct
@@ -123,6 +125,25 @@ typedef enum {
     AST_OP_OR,
 } AST_OperatorType;
 
+// data types
+typedef enum {
+    AST_DATA_I1,
+    AST_DATA_I2,
+    AST_DATA_I4,
+    AST_DATA_I8,
+    AST_DATA_U1,
+    AST_DATA_U2,
+    AST_DATA_U4,
+    AST_DATA_U8,
+    AST_DATA_C1,
+    AST_DATA_C2,
+    AST_DATA_C4,
+    AST_DATA_F4,
+    AST_DATA_F8,
+    AST_DATA_B1,
+    AST_DATA_V0,
+} AST_DataType;
+
 // expression
 typedef enum {
     AST_EX_LITERAL,
@@ -142,6 +163,7 @@ struct AST_Expression {
         AST_Location location;
         AST_Variable variable;
         AST_MemberAccess memberAccess;
+        AST_DataType dataType;
 
         struct {
             AST_Expression *operand;

@@ -51,6 +51,8 @@ static int parse_location(Parser *parser, AST_Location *loc) {
         return 0;
     }
 
+    if (loc->size->type == AST_EX_DATA_TYPE) loc->readAs = loc->size;
+
     if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
         ast_expression_free(loc->offset);
         ast_expression_free(loc->size);
@@ -61,6 +63,8 @@ static int parse_location(Parser *parser, AST_Location *loc) {
 }
 
 static int parse_field(Parser *parser, AST_Field *field) {
+    *field = (AST_Field){0};
+    
     Token identifier = parser->current;
     if (!parser_match(parser, TOKEN_IDENTIFIER)) return 0;
 
@@ -79,6 +83,8 @@ static int parse_field(Parser *parser, AST_Field *field) {
         ast_expression_free(field->offset);
         return 0;
     }
+
+    if (field->size->type == AST_EX_DATA_TYPE) field->readAs = field->size;
 
     if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
         ast_expression_free(field->offset);
@@ -206,6 +212,38 @@ static AST_Expression *parse_parenthesized(Parser *parser) {
     return exp;
 }
 
+static AST_Expression *parse_data_type(Parser *parser) {
+    AST_Expression *exp = malloc(sizeof(*exp));
+    if (!exp) return NULL;
+
+    exp->type = AST_EX_DATA_TYPE;
+
+    switch (parser->current.type) {
+        case TOKEN_I1: exp->dataType = AST_DATA_I1; break;
+        case TOKEN_I2: exp->dataType = AST_DATA_I2; break;
+        case TOKEN_I4: exp->dataType = AST_DATA_I4; break;
+        case TOKEN_I8: exp->dataType = AST_DATA_I8; break;
+        case TOKEN_U1: exp->dataType = AST_DATA_U1; break;
+        case TOKEN_U2: exp->dataType = AST_DATA_U2; break;
+        case TOKEN_U4: exp->dataType = AST_DATA_U4; break;
+        case TOKEN_U8: exp->dataType = AST_DATA_U8; break;
+        case TOKEN_C1: exp->dataType = AST_DATA_C1; break;
+        case TOKEN_C2: exp->dataType = AST_DATA_C2; break;
+        case TOKEN_C4: exp->dataType = AST_DATA_C4; break;
+        case TOKEN_F4: exp->dataType = AST_DATA_F4; break;
+        case TOKEN_F8: exp->dataType = AST_DATA_F8; break;
+        case TOKEN_B1: exp->dataType = AST_DATA_B1; break;
+        case TOKEN_V0: exp->dataType = AST_DATA_V0; break;
+        default: ast_expression_free(exp); return NULL;
+    }
+    if (!parser_next(parser)) {
+        ast_expression_free(exp);
+        return NULL;
+    }
+
+    return exp;
+}
+
 static AST_Expression *parse_primary(Parser *parser) {
     switch (parser->current.type) {
         case TOKEN_INT_LITERAL: case TOKEN_FLOAT_LITERAL: case TOKEN_TRUE: case TOKEN_FALSE:
@@ -216,6 +254,10 @@ static AST_Expression *parse_primary(Parser *parser) {
         case TOKEN_IDENTIFIER: return parse_identifier(parser);
 
         case TOKEN_LEFT_PAREN: return parse_parenthesized(parser);
+
+        case TOKEN_I1: case TOKEN_I2: case TOKEN_I4: case TOKEN_I8: case TOKEN_U1: case TOKEN_U2: case TOKEN_U4: case TOKEN_U8:
+        case TOKEN_C1: case TOKEN_C2: case TOKEN_C4: case TOKEN_F4: case TOKEN_F8: case TOKEN_B1: case TOKEN_V0:
+            return parse_data_type(parser);
     
         default: return NULL;
     }
