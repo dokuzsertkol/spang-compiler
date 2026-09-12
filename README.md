@@ -1,8 +1,6 @@
 # Spang
 
-Spang is a experimental systems-oriented programming language built around one idea: the developer should see the stack, the frame, and the memory layout directly instead of hiding it behind abstraction layers.
-
-The language is intentionally blunt. It does not pretend that memory is safe, clean, or friendly. It exposes pointers, offsets, and sizes as first-class concepts and treats them as the natural shape of computation.
+Spang is an experimental systems-oriented language built around one idea: memory locations should be explicit. Stack frames, offsets, widths, and interpretations are part of the language model instead of hidden implementation details.
 
 The project motto is simple:
 
@@ -10,166 +8,166 @@ Spang, spank the stack!
 
 ## Philosophy
 
-Spang is my personal answer to the question: what if a language removed most of the protective fiction of modern high-level languages and forced the developer to work with memory as truth instead of as a hidden implementation detail?
-
-In my view, Spang is not a language for comfort. It is a language for control.
-
-The guiding ideas are:
+Spang favors control and explicit layout over protective abstractions. Its guiding ideas are:
 
 - no hidden memory magic
-- no deep abstraction layers between the programmer and the runtime
-- variables are aliases to memory regions, not abstract typed values
+- variables are named views over memory locations
 - stack frames are visible and addressable
-- the compiler should not hide the cost of layout
-- the developer is trusted to understand the machine model
+- layout costs should be visible to the programmer
+- the programmer is trusted to understand the machine model
 
-This is not a language that tries to make everything safe. It is a language that makes everything explicit.
+The language uses familiar punctuation for compactness, but its central abstraction is not a conventional object or value. It is a location.
 
-## Personal definition of Spang
+## Language model
 
-I think of Spang as a stack-first, pointer-first, low-level language with C-like syntax but a much more raw memory model.
+### Locations are the fundamental abstraction
 
-It is a language where:
+Spang does not treat arrays, structs, pointers, and variables as fundamentally different memory concepts. They are different ways of describing or deriving locations.
 
-- a variable is a named view over a location in memory
-- data is described by base, offset, and size
-- type information is mostly about byte layout and interpretation, not about enforced safety
-- memory access is driven by expressions that resolve to addresses and widths
-- stack and frame boundaries are visible to the programmer
-- the runtime remains honest about how memory is allocated and addressed
+A variable names a location:
 
-So Spang is not “C with a different name.” It is more like C stripped down to its raw mechanics, then made more explicit and less forgiving.
-
-## Core language model
-
-### 1. Memory is addressed by base + offset + size
-
-The core rule is that every variable or memory slot is effectively described as:
-
-- a base: sp, fp, hp, or another addressable base
-- an offset: an expression
-- a size: an expression or type-like size marker
-
-The canonical form is:
-
-```
-var_name [base+offset, size];
+```spang
+value [fp + 0, i4];
 ```
 
-The base can be:
+A struct field derives a location from a named offset:
 
-- sp: stack pointer
-- fp: function pointer / current frame pointer
-- hp: heap pointer
-
-The important point is that every memory location is a view into a byte region, and that region can be assigned to or read from directly.
-
-### 2. Variables are aliases, not magical values
-
-A declaration such as:
-
-```
-value [sp+8, int];
+```spang
+value.x;
 ```
 
-does not create a protected typed variable in the abstract sense. It creates a named alias for a memory region whose size is described by the declared size.
+An indexed region derives a location from an explicit offset:
 
-The value is whatever bytes exist at that address, interpreted according to the size and whatever rules the code chooses to apply.
-
-### 3. No type safety by default
-
-Spang does not aim for strict type safety.
-
-In this language:
-
-- types describe layout, size, and parsing conventions
-- they are not a rigid protection barrier
-- a value may be treated as an integer, a char, a float, or a raw byte sequence depending on how the program chooses to interpret it
-- the developer is responsible for the interpretation of memory
-
-That is a deliberate design choice. The compiler may help with parsing and size handling, but it is not there to protect the programmer from their own assumptions.
-
-### 4. Assignments are memory operations
-
-Assignments can target:
-
-- a named variable alias
-- an explicit memory address
-- a base + offset + size region
-
-Examples:
-
-```
-var_name = expression;
-[base+offset, size] = expression;
+```spang
+value.[i * 4, i4];
 ```
 
-This means memory can be assigned directly and the target is just another addressable region.
+The common primitive is a location described by a base, an offset, and a size.
 
-### 5. sp is a working pointer into the active stack frame
+### Locations use base, offset, and size
 
-The stack pointer is a mutable, developer-facing pointer.
+The canonical location form is:
 
-It can be used as a pointer to a memory address or as a base for named aliases.
-
-Examples:
-
-```
-sp [base+offset, size];
-sp var_name;
-sp base+offset;
+```spang
+var_name [base + offset, size];
 ```
 
-The idea is that sp acts like a waypoint into the current execution stack. It can be used to access live stack memory while the frame lives.
+The available bases are:
 
-This is useful for walking around the frame, aliasing parts of it, and storing data in a known relative address space.
+- `sp`: developer-controlled writable base
+- `fp`: current function frame pointer
+- `hp`: heap pointer
+- `bp`: base pointer
 
-### 6. fp is the current function frame pointer
+The `offset` is an expression. The `size` is an expression that resolves to a byte width, or a datatype expression used as a read-as interpretation.
 
-fp represents the current function frame. It is the frame anchor that gives the language a coherent stack layout inside a function.
+For example:
 
-It is treated as a read-mostly frame reference, and it is only meaningful within the active function scope. When the scope changes, fp changes with it.
-
-Typical usage:
-
+```spang
+elma [fp + 0, 10 * i4];
 ```
-fp foo (param1 [0, int], param2 [4, 4]) [int] {
+
+Here, `10 * i4` can describe a region ten elements wide. A datatype can also be used directly:
+
+```spang
+elma [fp + 0, i4];
+```
+
+In this form, `i4` supplies the width and can also be retained as the location's `readAs` interpretation.
+
+### Variables are aliases
+
+A declaration creates a named alias for a memory region. It does not create a protected abstract value with automatic ownership or bounds checking.
+
+The bytes at that location can be assigned or read through the alias. Their meaning depends on the width and interpretation used by the program.
+
+### Datatypes describe layout and interpretation
+
+Type information in Spang primarily describes memory layout and interpretation.
+
+The scalar datatypes are:
+
+```text
+i1 i2 i4 i8
+u1 u2 u4 u8
+f4 f8
+c1 c2 c4
+b1
+v0
+```
+
+Widths and interpretations should use one of the
+explicit datatype names above.
+
+A datatype expression can be used as a read-as marker when accessing a location:
+
+```spang
+value [fp + 0, i4];
+```
+
+The datatype does not imply ownership, bounds checking, or automatic memory safety. It describes how the accessed bytes should be interpreted. The programmer remains responsible for choosing a valid location and interpretation.
+
+### Memory access expressions
+
+Spang does not require arrays to be a built-in language abstraction.
+
+A memory region can be accessed by creating another location relative to an existing one:
+
+```spang
+elma [fp + 0, 10 * i4];
+
+elma.[0, i4] = 10;
+elma.[i * 4, i4] = 20;
+```
+
+The syntax is:
+
+```spang
+parent.[offset, size]
+```
+
+It creates a new memory access expression. The `offset` is relative to the parent location, and the `size` describes the width of the accessed region. The optional datatype form also supplies a read-as interpretation.
+
+For example, `elma.[i * 4, i4]` can access the `i`th four-byte element of a memory region. The compiler does not need to know that the original region is an array. It only needs to evaluate the parent location, offset, size, and interpretation.
+
+### Named and explicit access
+
+Struct-like data can be accessed through named members:
+
+```spang
+point.x = 10;
+```
+
+Arbitrary memory regions can be accessed through explicit location access:
+
+```spang
+buffer.[offset, size] = value;
+```
+
+Both forms operate on a parent expression. Named access uses a declared member, while explicit access uses a runtime offset and width. In the AST these are separate expression forms: member access and location access.
+
+### sp, fp, hp, and bp
+
+`sp` is the one writable base in the language: the developer can set it and use it as a controllable starting point for location expressions. Its name reflects its intended use in stack-oriented code, not a requirement that it always refer to the active runtime stack.
+
+`fp` is the current function frame pointer and provides the frame anchor for function-relative layout. `hp` refers to the heap area, while `bp` is available as another base location. These bases are not interchangeable with `sp`: only `sp` is explicitly developer-controlled and writable.
+
+For example:
+
+```spang
+fp foo (param1 [0, i4], param2 [4, i4]) [i4] {
     ...
 }
 ```
 
-This is how function parameters and local storage are conceptually mapped to frame-relative memory.
+These names describe the intended memory model. The exact operations supported by each base are still part of the compiler's ongoing development.
 
-### 7. hp is the heap pointer and remains global across runtime
+### Functions and control flow
 
-hp is the heap base pointer and is intentionally global in the sense that it persists throughout the runtime and is accessible from anywhere the language allows access.
+Function declarations, conditionals, loops, calls, and assignments use compact, familiar syntax:
 
-This means the heap is treated as a global memory arena rather than a hidden malloc-backed abstraction.
-
-Example:
-
-```
-[hp+offset, size] = expression;
-```
-
-This is intentionally direct and runtime-visible.
-
-### 8. No inner scoping model
-
-This language intentionally avoids the decorative safety net of nested block scoping. The model is simple: there is no elaborate inner block isolation story.
-
-This keeps scope behavior closer to primitive frame semantics and makes the stack layout easier to reason about.
-
-### 9. Syntax is C-like, but the semantics are lower level
-
-The language borrows C-style syntax because it is familiar and compact, but the semantics are intentionally more memory-oriented than classic C.
-
-Example:
-
-```
+```spang
 if (condition) {
-    ...
-} else if (other_condition) {
     ...
 } else {
     ...
@@ -180,65 +178,43 @@ while (condition) {
 }
 ```
 
-The control flow forms are meant to feel C-like, while memory layout is still the central concern.
+The syntax is deliberately compact; the language's identity comes from its location model rather than from its control-flow notation.
 
 ## Example syntax
 
-### Variable declaration
+### Variable declaration and assignment
 
-```
-var_name [base+offset, size];
-```
-
-The offset and size are expressions. The base is either sp, fp, or hp.
-
-### Assignment
-
-```
+```spang
+var_name [base + offset, size];
 var_name = expression;
-[base+offset, size] = expression;
 ```
 
-### Set pointer
+### Direct location access
 
-```
-sp [base+offset, size];
-sp var_name;
-sp base+offset;
-```
-
-### Heap access
-
-```
-[hp+offset, size] = expression;
-```
-
-### Function declaration
-
-```
-fp foo (param1 [0, int], param2 [4, 4]) [int] {
-    // locals are also frame-relative
-    // fp-offset, size for local memory
-}
+```spang
+[fp + offset, size] = expression;
+[hp + offset, size] = expression;
 ```
 
 ### Struct-like declaration
 
-```
+```spang
 struct mystruct {
     x [offset, size],
     y [offset, size],
 }
 ```
 
-Then usage can look like:
+Usage can combine named and explicit access:
 
-```
-var_name [base+offset, mystruct];
-var_name.x = expression;
+```spang
+point [fp + 0, mystruct];
+
+point.x = 10;
+point.[4, i4] = 20;
 ```
 
-This is a direct field-style access to a memory layout rather than a traditional high-level object model.
+This shows that struct fields and array-like regions are both derived from the same location model.
 
 ## Current project status
 
@@ -248,22 +224,19 @@ At the moment:
 
 - the lexer is implemented
 - AST-related parsing work is in progress
+- the AST now represents datatype expressions, named member access, and explicit location access
 - the rest of the compiler pipeline is older experimental code from previous learning work
 - the project is not yet a complete, production-ready compiler
 
-The current focus is the parser and AST layer, which is the foundation needed before semantic analysis, IR generation, and code generation can be completed.
+Some examples in this document describe the intended language model and may not yet be implemented by the current compiler. Syntax accepted by the parser and the future semantic rules are still being established.
 
 ## Repository structure
 
-- main.c: entry point for the compiler
-- src/lexer.c / src/lexer.h: lexical analysis
-- src/parser.c / src/parser.h: parser work in progress
-- src/ast.h: AST definitions and memory-related language model
-- src/semantic_analyser.c / src/semantic_analyser.h: future analysis layer
-- src/ir.c / src/ir.h: intermediate representation work
-- src/codegen.c / src/codegen.h: code generation work
-- input/: sample language input files
-- output/: generated output artifacts
+- `main.c`: entry point for the compiler
+- `src/lexer.c` / `src/lexer.h`: lexical analysis
+- `src/parser.c` / `src/parser.h`: parser work in progress
+- `src/ast.c` / `src/ast.h`: AST structures and memory management
+- `src/token.c` / `src/token.h`: token definitions and literal conversion
 
 ## Build and run
 
@@ -296,18 +269,18 @@ while (elma == 1) {
 And another sample uses pointer-style local and global memory layout:
 
 ```
-fp foo (p1 [0, int], p2 [4, 4]) [int] {
-    [fp-30, int] = [fp, int] + p2;
-    return [fp-30, int];
+fp foo (p1 [0, i4], p2 [4, i4]) [i4] {
+    [fp-30, i4] = [fp, i4] + p2;
+    return [fp-30, i4];
 }
 
-fp main() [int] {
-    elma [fp, int];
-    armut [sp, int];
-    [hp-12, int] = 5;
-    kavun [hp-12, int];
-    [fp-48, int] = foo(karpuz, [fp-40, int]);
-    return [fp-48, int];
+fp main() [i4] {
+    elma [fp, i4];
+    armut [sp, i4];
+    [hp-12, i4] = 5;
+    kavun [hp-12, i4];
+    [fp-48, i4] = foo(karpuz, [fp-40, i4]);
+    return [fp-48, i4];
 }
 ```
 
