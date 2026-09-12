@@ -44,6 +44,9 @@ void ast_expression_free(AST_Expression *exp) {
 
         case AST_EX_MEMBER_ACCESS: ast_expression_free(exp->memberAccess.parent); break;
 
+        case AST_EX_LOCATION_ACCESS: ast_expression_free(exp->locationAccess.parent); ast_expression_free(exp->locationAccess.size);
+            ast_expression_free(exp->locationAccess.offset); break;
+
         case AST_EX_DATA_TYPE: break;
 
         case AST_EX_CALL: ast_expression_free(exp->call.function);

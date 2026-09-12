@@ -263,12 +263,62 @@ static AST_Expression *parse_primary(Parser *parser) {
     }
 }
 
-static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) {
-    if (!parser_match(parser, TOKEN_DOT)) {
+static AST_Expression *parse_location_access(Parser *parser, AST_Expression *exp) {
+    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) {
         ast_expression_free(exp);
         return NULL;
     }
 
+    AST_Expression *offset = parse_expression(parser);
+    if (!offset) {
+        ast_expression_free(exp);
+        return NULL;
+    }
+
+    if (!parser_match(parser, TOKEN_COMMA)) {
+        ast_expression_free(exp);
+        ast_expression_free(offset);
+        return NULL;
+    }
+
+    AST_Expression *size = parse_expression(parser);
+    if (!size) {
+        ast_expression_free(exp);
+        ast_expression_free(offset);
+        return NULL;
+    }
+
+    AST_Expression *readAs = (size->type == AST_EX_DATA_TYPE) ? size : NULL;
+
+    if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
+        ast_expression_free(exp);
+        ast_expression_free(offset);
+        ast_expression_free(size);
+        return NULL;
+    }
+
+    AST_Expression *access = malloc(sizeof(*access));
+    if (!access) {
+        ast_expression_free(exp);
+        ast_expression_free(offset);
+        ast_expression_free(size);
+        return NULL;
+    }
+
+    *access = (AST_Expression){
+        .type = AST_EX_LOCATION_ACCESS,
+        .locationAccess = {
+            .parent = exp,
+            .offset = offset,
+            .size = size,
+            .readAs = readAs,
+        },
+    };
+
+    return access;
+}
+
+static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) {
     Token member = parser->current;
 
     if (!parser_match(parser, TOKEN_IDENTIFIER)) {
@@ -375,7 +425,16 @@ static AST_Expression *parse_postfix(Parser *parser) {
                 break;
 
             case TOKEN_DOT:
-                exp = parse_member_access(parser, exp);
+                if (!parser_match(parser, TOKEN_DOT)) {
+                    ast_expression_free(exp);
+                    return NULL;
+                }
+
+                if (parser->current.type == TOKEN_LEFT_BRACKET) {
+                    exp = parse_location_access(parser, exp);
+                } 
+                else exp = parse_member_access(parser, exp);
+
                 if (!exp) return NULL;
                 break;
 

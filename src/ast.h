@@ -81,6 +81,14 @@ typedef struct {
     size_t fieldCount;
 } AST_StructDeclaration;
 
+// location access
+typedef struct {
+    AST_Expression *offset;
+    AST_Expression *size;
+    AST_Expression *readAs;
+    AST_Expression *parent;
+} AST_LocationAccess;
+
 // member access
 typedef struct {
     const char *name;
@@ -153,6 +161,7 @@ typedef enum {
     AST_EX_CALL,
     AST_EX_UNARY,
     AST_EX_MEMBER_ACCESS,
+    AST_EX_LOCATION_ACCESS,
     AST_EX_DATA_TYPE,
 } AST_ExpressionType;
 
@@ -163,6 +172,7 @@ struct AST_Expression {
         AST_Location location;
         AST_Variable variable;
         AST_MemberAccess memberAccess;
+        AST_LocationAccess locationAccess;
         AST_DataType dataType;
 
         struct {
