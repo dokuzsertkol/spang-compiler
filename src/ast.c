@@ -106,6 +106,10 @@ void ast_node_free(AST_Node *node) {
 
         case AST_CONTINUE: break;
 
+        case AST_SP_ASSIGNMENT: ast_expression_free(node->spAssignment.value); break;
+
+        case AST_SP_LOCATION: ast_expression_free(node->spLocation.initializer); break;
+
         case AST_END: break;
     }
 

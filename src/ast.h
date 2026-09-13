@@ -152,6 +152,16 @@ typedef enum {
     AST_DATA_V0,
 } AST_DataType;
 
+// sp
+typedef struct {
+    AST_Location location;
+    AST_Expression *initializer;
+} AST_SPLocation;
+
+typedef struct {
+    AST_Expression *value;
+} AST_SPAssignment;
+
 // expression
 typedef enum {
     AST_EX_LITERAL,
@@ -238,6 +248,8 @@ typedef enum {
 
     AST_ASSIGNMENT,
     AST_EXPRESSION_STATEMENT,
+    AST_SP_LOCATION,
+    AST_SP_ASSIGNMENT,
 
     AST_IF,
     AST_WHILE,
@@ -262,6 +274,8 @@ struct AST_Node {
         AST_VariableDeclaration variableDeclaration;
         AST_Return returnStatement;
         AST_StructDeclaration structDeclaration;
+        AST_SPLocation spLocation;
+        AST_SPAssignment spAssignment;
     };
 };
 

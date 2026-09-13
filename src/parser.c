@@ -1146,7 +1146,7 @@ static AST_Node *parse_function_declaration(Parser *parser) {
     return node;
 }
 
-static AST_Node *parse_return(Parser *parser) {
+static AST_Node *parse_return_statement(Parser *parser) {
     if(!parser_match(parser, TOKEN_RETURN)) return NULL;
 
     AST_Expression *value = NULL;
@@ -1262,7 +1262,7 @@ static AST_Node *parse_while_statement(Parser *parser) {
     return node;
 }
 
-static AST_Node *parse_break(Parser *parser) {
+static AST_Node *parse_break_statement(Parser *parser) {
     if (!parser_match(parser, TOKEN_BREAK)) return NULL;
 
     if (!parser_match(parser, TOKEN_SEMICOLON)) return NULL;
@@ -1275,7 +1275,7 @@ static AST_Node *parse_break(Parser *parser) {
     return node;
 }
 
-static AST_Node *parse_continue(Parser *parser) {
+static AST_Node *parse_continue_statement(Parser *parser) {
     if (!parser_match(parser, TOKEN_CONTINUE)) return NULL;
 
     if (!parser_match(parser, TOKEN_SEMICOLON)) return NULL;
@@ -1285,6 +1285,78 @@ static AST_Node *parse_continue(Parser *parser) {
 
     *node = (AST_Node){ .type = AST_CONTINUE };
     return node;
+}
+
+static AST_Node *parse_sp_assignment(Parser *parser) {
+    if(!parser_match(parser, TOKEN_EQUAL)) return NULL;
+
+    AST_Expression *value = parse_expression(parser);
+    if (!value) return NULL;
+
+    if (!parser_match(parser, TOKEN_SEMICOLON)) {
+        ast_expression_free(value);
+        return NULL;
+    }
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        ast_expression_free(value);
+        return NULL;
+    }
+
+    *node = (AST_Node){
+        .type = AST_SP_ASSIGNMENT,
+        .spAssignment = {
+            .value = value,
+        },
+    };
+    return node;
+}
+
+static AST_Node *parse_sp_location(Parser *parser) {
+    AST_Location loc = {0};
+    if (!parse_location(parser, &loc)) return NULL;
+
+    AST_Expression *initializer = NULL;
+    if (parser->current.type == TOKEN_EQUAL) {
+        if(!parser_next(parser)) return NULL;
+
+        initializer = parse_expression(parser);
+        if (!initializer) return NULL;
+    }
+
+    if (!parser_match(parser, TOKEN_SEMICOLON)) {
+        ast_expression_free(initializer);
+        return NULL;
+    }
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        ast_expression_free(initializer);
+        return NULL;
+    }
+
+    *node = (AST_Node){
+        .type = AST_SP_LOCATION,
+        .spLocation = {
+            .location = loc,
+            .initializer = initializer,
+        },
+    };
+    return node;
+
+}
+
+static AST_Node *parse_sp_statement(Parser *parser) {
+    if(!parser_match(parser, TOKEN_SP)) return NULL;
+
+    switch (parser->current.type) {
+        case TOKEN_LEFT_BRACKET: return parse_sp_location(parser);
+
+        case TOKEN_EQUAL: return parse_sp_assignment(parser);
+
+        default: return NULL;
+    }
 }
 
 static AST_Node *parse_statement(Parser *parser) {
@@ -1301,11 +1373,13 @@ static AST_Node *parse_statement(Parser *parser) {
         
         case TOKEN_FP: return parse_function_declaration(parser);
 
-        case TOKEN_RETURN: return parse_return(parser);
+        case TOKEN_RETURN: return parse_return_statement(parser);
         
-        case TOKEN_BREAK: return parse_break(parser);
+        case TOKEN_BREAK: return parse_break_statement(parser);
 
-        case TOKEN_CONTINUE: return parse_continue(parser);
+        case TOKEN_CONTINUE: return parse_continue_statement(parser);
+
+        case TOKEN_SP: return parse_sp_statement(parser); 
 
         default: return NULL;
     }
