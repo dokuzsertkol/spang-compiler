@@ -79,6 +79,9 @@ typedef struct {
     TokenType type;
     const char *start;
     size_t length;
+    
+    size_t line;
+    size_t column;
 } Token;
 
 uint64_t token_to_int(const Token *token);

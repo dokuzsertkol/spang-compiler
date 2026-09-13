@@ -1,14 +1,15 @@
 #include <string.h>
+#include <stdio.h>
 #include "lexer.h"
 #include "token.h"
 
 Lexer lexer_init(const char *source) {
-    Lexer lexer;
-
-    lexer.source = source;
-    lexer.current = source;
-
-    return lexer;
+    return (Lexer) {
+        .source = source,
+        .current = source,
+        .line = 1,
+        .column = 1,
+    };
 }
 
 static int is_identifier_start(const char c) {
@@ -23,27 +24,39 @@ static int is_identifier_char(const char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
 }
 
+static void lexer_advance(Lexer *lexer, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        if (*lexer->current == '\0') return;
+
+        if (*lexer->current == '\n') {
+            lexer->line++;
+            lexer->column = 1;
+        }
+        else lexer->column++;
+
+        lexer->current++;
+    }
+}
+
 static int lexer_skip_whitespace_and_comments(Lexer *lexer) {
     while (1) {
         // whitespace
-        while (*lexer->current == ' ' || *lexer->current == '\n' || *lexer->current == '\t') lexer->current++;
+        while (*lexer->current == ' ' || *lexer->current == '\n' || *lexer->current == '\t') lexer_advance(lexer, 1);
         
         // comment
         if (lexer->current[0] == '/' && lexer->current[1] == '/') {
-            while (*lexer->current != '\n' && *lexer->current != '\0') lexer->current++;
+            while (*lexer->current != '\n' && *lexer->current != '\0')lexer_advance(lexer, 1);
             continue;
         }
         if (lexer->current[0] == '/' && lexer->current[1] == '*') {
-            lexer->current += 2;
+            lexer_advance(lexer, 2);
 
-            while (*lexer->current != '\0' &&
-                !(lexer->current[0] == '*' &&
-                    lexer->current[1] == '/')) {
-                lexer->current++;
+            while (*lexer->current != '\0' && !(lexer->current[0] == '*' && lexer->current[1] == '/')) {
+                lexer_advance(lexer, 1);
             }
 
             if (*lexer->current == '\0') return 0;
-            else lexer->current += 2;
+            else lexer_advance(lexer, 2);
             continue;
         }
         break;
@@ -144,7 +157,9 @@ static TokenType lexer_keyword_type(const char *start, const size_t length) {
 static Token lexer_prefixed_char_and_string(Lexer *lexer) {
     Token token = {
         .start = lexer->current,
-        .length = 0
+        .length = 0,
+        .line = lexer->line,
+        .column = lexer->column,
     };
 
     char prefix = lexer->current[0];
@@ -156,11 +171,11 @@ static Token lexer_prefixed_char_and_string(Lexer *lexer) {
         token.type = prefix == 'u' ? TOKEN_S2_LITERAL : TOKEN_S4_LITERAL;
     }
 
-    lexer->current += 2;
+    lexer_advance(lexer, 2);
 
     while (*lexer->current != quote && *lexer->current != '\0') {
-        if (*lexer->current == '\\' && lexer->current[1] != '\0') lexer->current += 2;
-        else lexer->current++;
+        if (*lexer->current == '\\' && lexer->current[1] != '\0') lexer_advance(lexer, 2);
+        else lexer_advance(lexer, 1);
     }
 
     if (*lexer->current == '\0') {
@@ -168,7 +183,7 @@ static Token lexer_prefixed_char_and_string(Lexer *lexer) {
         return token;
     }
 
-    lexer->current++;
+    lexer_advance(lexer, 1);
 
     token.length = lexer->current - token.start;
     return token;
@@ -177,18 +192,20 @@ static Token lexer_prefixed_char_and_string(Lexer *lexer) {
 static Token lexer_char_and_string(Lexer *lexer) {
     Token token = {
         .start = lexer->current,
-        .length = 0
+        .length = 0,
+        .line = lexer->line,
+        .column = lexer->column,
     };
 
     char quote = *lexer->current;
 
     token.type = quote == '\'' ? TOKEN_C1_LITERAL : TOKEN_S1_LITERAL;
 
-    lexer->current++;
+    lexer_advance(lexer, 1);
 
     while (*lexer->current != quote && *lexer->current != '\0') {
-        if (*lexer->current == '\\' && lexer->current[1] != '\0') lexer->current += 2;
-        else lexer->current++;
+        if (*lexer->current == '\\' && lexer->current[1] != '\0') lexer_advance(lexer, 2);
+        else lexer_advance(lexer, 1);
     }
 
     if (*lexer->current == '\0') {
@@ -196,7 +213,7 @@ static Token lexer_char_and_string(Lexer *lexer) {
         return token;
     }
 
-    lexer->current++;
+    lexer_advance(lexer, 1);
 
     token.length = lexer->current - token.start;
     return token;
@@ -205,14 +222,16 @@ static Token lexer_char_and_string(Lexer *lexer) {
 static Token lexer_identifier(Lexer *lexer) {
     Token token = {
         .start = lexer->current,
-        .length = 0
+        .length = 0,
+        .line = lexer->line,
+        .column = lexer->column,
     };
 
     while (is_identifier_char(lexer->current[token.length])) token.length++;
 
     token.type = lexer_keyword_type(token.start, token.length);
 
-    lexer->current += token.length;
+    lexer_advance(lexer, token.length);
 
     return token;
 }
@@ -221,7 +240,9 @@ static Token lexer_number(Lexer *lexer) {
     Token token = {
         .start = lexer->current,
         .length = 0,
-        .type = TOKEN_INT_LITERAL
+        .type = TOKEN_INT_LITERAL,
+        .line = lexer->line,
+        .column = lexer->column,
     };
 
     int dot_count = 0;
@@ -249,7 +270,7 @@ static Token lexer_number(Lexer *lexer) {
         break;
     }
 
-    lexer->current += token.length;
+    lexer_advance(lexer, token.length);
 
     return token;
 }
@@ -257,7 +278,9 @@ static Token lexer_number(Lexer *lexer) {
 static Token lexer_punctuation(Lexer *lexer) {
     Token token = {
         .start = lexer->current,
-        .length = 1
+        .length = 1,
+        .line = lexer->line,
+        .column = lexer->column,
     };
 
     switch (*lexer->current) {
@@ -332,18 +355,33 @@ static Token lexer_punctuation(Lexer *lexer) {
         default: token.type = TOKEN_ERROR; break;
     }
 
-    lexer->current += token.length;
+    lexer_advance(lexer, token.length);
 
     return token;
 }
 
 Token lexer_next_token(Lexer *lexer) {
 
-    if (!lexer_skip_whitespace_and_comments(lexer)) return (Token) { .type = TOKEN_ERROR };
+    if (!lexer_skip_whitespace_and_comments(lexer)) {
+        return (Token) {
+            .type = TOKEN_ERROR,
+            .start = lexer->current,
+            .length = 0,
+            .line = lexer->line,
+            .column = lexer->column,
+        };
+    }
 
     char c = *lexer->current;
-
-    if (c == '\0') return (Token) { .type = TOKEN_EOF };
+    if (c == '\0') {
+        return (Token) {
+            .type = TOKEN_EOF,
+            .start = lexer->current,
+            .length = 0,
+            .line = lexer->line,
+            .column = lexer->column,
+        };
+    }
 
     if (c == '\'' || c == '"') return lexer_char_and_string(lexer);
 
@@ -366,7 +404,7 @@ void lexer_print(const Lexer *lexer) {
     do {
         token = lexer_next_token(&copy);
 
-        printf("TOKEN: ");
+        printf("TOKEN: %zu:%zu ", token.line, token.column);
 
         switch (token.type) {
             case TOKEN_EOF: printf("EOF"); break;

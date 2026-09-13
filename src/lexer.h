@@ -1,10 +1,12 @@
 #pragma once
-#include <stdio.h>
 #include "token.h"
 
 typedef struct {
     const char* source;
     const char *current;
+
+    size_t line;
+    size_t column;
 } Lexer;
 
 Lexer lexer_init(const char* source);
