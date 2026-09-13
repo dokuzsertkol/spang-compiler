@@ -244,6 +244,18 @@ static AST_Expression *parse_data_type(Parser *parser) {
     return exp;
 }
 
+static AST_Expression *parse_sp(Parser *parser) {
+    if(!parser_match(parser, TOKEN_SP)) return NULL;
+
+    AST_Expression *exp = malloc(sizeof(*exp));
+    if (!exp) return NULL;
+
+    *exp = (AST_Expression) {
+        .type = AST_EX_SP,
+    };
+    return exp;
+} 
+
 static AST_Expression *parse_primary(Parser *parser) {
     switch (parser->current.type) {
         case TOKEN_INT_LITERAL: case TOKEN_FLOAT_LITERAL: case TOKEN_TRUE: case TOKEN_FALSE:
@@ -259,6 +271,8 @@ static AST_Expression *parse_primary(Parser *parser) {
         case TOKEN_C1: case TOKEN_C2: case TOKEN_C4: case TOKEN_F4: case TOKEN_F8: case TOKEN_B1: case TOKEN_V0:
             return parse_data_type(parser);
     
+        case TOKEN_SP: return parse_sp(parser);
+
         default: return NULL;
     }
 }
@@ -1287,52 +1301,81 @@ static AST_Node *parse_continue_statement(Parser *parser) {
     return node;
 }
 
-static AST_Node *parse_sp_assignment(Parser *parser) {
-    if(!parser_match(parser, TOKEN_EQUAL)) return NULL;
+static AST_Node *parse_sp_assignment(Parser *parser, AST_Expression *target) {
+    if(!parser_match(parser, TOKEN_EQUAL)) {
+        ast_expression_free(target);
+        return NULL;
+    }
 
     AST_Expression *value = parse_expression(parser);
-    if (!value) return NULL;
+    if (!value){
+        ast_expression_free(target);
+        return NULL;
+    }
 
     if (!parser_match(parser, TOKEN_SEMICOLON)) {
         ast_expression_free(value);
+        ast_expression_free(target);
         return NULL;
     }
 
     AST_Node *node = malloc(sizeof(*node));
     if (!node) {
         ast_expression_free(value);
+        ast_expression_free(target);
         return NULL;
     }
 
     *node = (AST_Node){
-        .type = AST_SP_ASSIGNMENT,
-        .spAssignment = {
+        .type = AST_ASSIGNMENT,
+        .assignment = {
+            .target = target,
             .value = value,
         },
     };
     return node;
 }
 
-static AST_Node *parse_sp_location(Parser *parser) {
+static AST_Node *parse_sp_location(Parser *parser, AST_Expression *target) {
+    if (target->type != AST_EX_SP) {
+        ast_expression_free(target);
+        return NULL;
+    }
+    ast_expression_free(target);
+
     AST_Location loc = {0};
-    if (!parse_location(parser, &loc)) return NULL;
+    if (!parse_location(parser, &loc)) {
+        return NULL;
+    }
 
     AST_Expression *initializer = NULL;
     if (parser->current.type == TOKEN_EQUAL) {
-        if(!parser_next(parser)) return NULL;
+        if(!parser_next(parser)) {
+            ast_expression_free(loc.size);
+            ast_expression_free(loc.offset);
+            return NULL;
+        }
 
         initializer = parse_expression(parser);
-        if (!initializer) return NULL;
+        if (!initializer) {
+            ast_expression_free(loc.size);
+            ast_expression_free(loc.offset);
+            return NULL;
+        }
     }
 
     if (!parser_match(parser, TOKEN_SEMICOLON)) {
         ast_expression_free(initializer);
+        ast_expression_free(loc.size);
+        ast_expression_free(loc.offset);
         return NULL;
     }
 
     AST_Node *node = malloc(sizeof(*node));
     if (!node) {
         ast_expression_free(initializer);
+        ast_expression_free(loc.size);
+        ast_expression_free(loc.offset);
         return NULL;
     }
 
@@ -1344,18 +1387,18 @@ static AST_Node *parse_sp_location(Parser *parser) {
         },
     };
     return node;
-
 }
 
 static AST_Node *parse_sp_statement(Parser *parser) {
-    if(!parser_match(parser, TOKEN_SP)) return NULL;
+    AST_Expression *target = parse_postfix(parser);
+    if (!target) return NULL;
 
     switch (parser->current.type) {
-        case TOKEN_LEFT_BRACKET: return parse_sp_location(parser);
+        case TOKEN_LEFT_BRACKET: return parse_sp_location(parser, target);
 
-        case TOKEN_EQUAL: return parse_sp_assignment(parser);
+        case TOKEN_EQUAL: return parse_sp_assignment(parser, target);
 
-        default: return NULL;
+        default: ast_expression_free(target); return NULL;
     }
 }
 

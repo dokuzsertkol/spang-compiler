@@ -52,6 +52,8 @@ void ast_expression_free(AST_Expression *exp) {
         case AST_EX_CALL: ast_expression_free(exp->call.function);
             for (size_t i = 0; i < exp->call.argumentCount; i++) ast_expression_free(exp->call.arguments[i]);
             free(exp->call.arguments); break;
+
+        case AST_EX_SP: break;
     }
     
     free(exp);
@@ -105,8 +107,6 @@ void ast_node_free(AST_Node *node) {
         case AST_BREAK: break;
 
         case AST_CONTINUE: break;
-
-        case AST_SP_ASSIGNMENT: ast_expression_free(node->spAssignment.value); break;
 
         case AST_SP_LOCATION: ast_expression_free(node->spLocation.initializer); break;
 

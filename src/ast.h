@@ -158,10 +158,6 @@ typedef struct {
     AST_Expression *initializer;
 } AST_SPLocation;
 
-typedef struct {
-    AST_Expression *value;
-} AST_SPAssignment;
-
 // expression
 typedef enum {
     AST_EX_LITERAL,
@@ -173,6 +169,7 @@ typedef enum {
     AST_EX_MEMBER_ACCESS,
     AST_EX_LOCATION_ACCESS,
     AST_EX_DATA_TYPE,
+    AST_EX_SP,
 } AST_ExpressionType;
 
 struct AST_Expression {
@@ -249,7 +246,6 @@ typedef enum {
     AST_ASSIGNMENT,
     AST_EXPRESSION_STATEMENT,
     AST_SP_LOCATION,
-    AST_SP_ASSIGNMENT,
 
     AST_IF,
     AST_WHILE,
@@ -275,7 +271,6 @@ struct AST_Node {
         AST_Return returnStatement;
         AST_StructDeclaration structDeclaration;
         AST_SPLocation spLocation;
-        AST_SPAssignment spAssignment;
     };
 };
 
