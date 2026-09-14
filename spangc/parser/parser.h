@@ -1,6 +1,6 @@
 #pragma once
-#include "lexer.h"
-#include "ast.h"
+#include "../lexer/lexer.h"
+#include "../ast/ast.h"
 
 typedef enum {
     PARSER_ERROR_UNEXPECTED_TOKEN,

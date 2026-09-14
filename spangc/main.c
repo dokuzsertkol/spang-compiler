@@ -1,6 +1,4 @@
-#include "src/ast.h"
-#include "src/lexer.h"
-#include "src/parser.h"
+#include "parser/parser.h"
 
 int main() {
     Lexer lexer;

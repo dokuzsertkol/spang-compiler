@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "lexer.h"
-#include "token.h"
 
 static char *get_source(const char *path) {
     FILE *input = fopen(path, "rb");

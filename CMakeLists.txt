@@ -6,11 +6,11 @@ set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(spangc
-    main.c
-    src/token.c
-    src/lexer.c
-    src/ast.c
-    src/parser.c
+    spangc/main.c
+    spangc/token/token.c
+    spangc/lexer/lexer.c
+    spangc/ast/ast.c
+    spangc/parser/parser.c
 )
 
-target_include_directories(spangc PRIVATE src)
+target_include_directories(spangc PRIVATE ${PROJECT_SOURCE_DIR}/spangc)

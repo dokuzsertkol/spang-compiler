@@ -1,5 +1,5 @@
 #pragma once
-#include "token.h"
+#include "../token/token.h"
 
 typedef struct {
     const char *path;
