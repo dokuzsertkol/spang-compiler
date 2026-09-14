@@ -1,7 +1,22 @@
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "lexer.h"
+
+int lexer_init(Lexer *lexer, const char *path) {
+    char *source = get_source(path);
+    if (!source) return 0;
+
+    *lexer = (Lexer) {
+        .path = path,
+        .source = source,
+        .current = source,
+        .line = 1,
+        .column = 1,
+    };
+
+    return 1;
+}
 
 static char *get_source(const char *path) {
     FILE *input = fopen(path, "rb");
@@ -41,29 +56,6 @@ static char *get_source(const char *path) {
     fclose(input);
 
     return source;
-}
-
-int lexer_init(Lexer *lexer, const char *path) {
-    char *source = get_source(path);
-    if (!source) return 0;
-
-    *lexer = (Lexer) {
-        .path = path,
-        .source = source,
-        .current = source,
-        .line = 1,
-        .column = 1,
-    };
-
-    return 1;
-}
-
-void lexer_free(Lexer *lexer) {
-    if (!lexer) return;
-
-    free(lexer->source);
-    lexer->source = NULL;
-    lexer->current = NULL;
 }
 
 static int is_identifier_start(const char c) {
@@ -447,28 +439,10 @@ Token lexer_next_token(Lexer *lexer) {
     return lexer_punctuation(lexer);
 }
 
-// debug
-void lexer_print(const Lexer *lexer) {
-    printf("=== LEXER PRINT ===\n");
+void lexer_free(Lexer *lexer) {
+    if (!lexer) return;
 
-    Lexer copy = *lexer;
-    Token token;
-
-    do {
-        token = lexer_next_token(&copy);
-
-        printf("TOKEN: %zu:%zu ", token.line, token.column);
-
-        printf("%s", token_type_to_string(token.type));
-
-        if (token.type != TOKEN_EOF) {
-            printf(" \"");
-            printf("%.*s", (int)token.length, token.start);
-            printf("\"");
-        }
-
-        putchar('\n');
-
-    } while (token.type != TOKEN_EOF);
-    printf("=== END ===\n\n");
+    free(lexer->source);
+    lexer->source = NULL;
+    lexer->current = NULL;
 }

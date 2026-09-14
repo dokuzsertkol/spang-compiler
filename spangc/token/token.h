@@ -2,7 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 typedef enum {
     TOKEN_EOF,
@@ -85,6 +84,9 @@ typedef struct {
     size_t column;
 } Token;
 
+static int token_escape_value(char c, uint32_t *value);
+static int token_utf8_decode(const Token *token, size_t *index, uint32_t *value);
+
 uint64_t token_to_int(const Token *token);
 double token_to_float(const Token *token);
 bool token_to_bool(const Token *token);
@@ -96,5 +98,3 @@ int token_to_c4(const Token *token, uint32_t *value);
 uint8_t *token_to_s1(const Token *token, size_t *length);
 uint16_t *token_to_s2(const Token *token, size_t *length);
 uint32_t *token_to_s4(const Token *token, size_t *length);
-
-const char *token_type_to_string(const TokenType tokenType);

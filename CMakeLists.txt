@@ -9,6 +9,7 @@ add_executable(spangc
     spangc/main.c
     spangc/token/token.c
     spangc/lexer/lexer.c
+    spangc/lexer/lexer_print.c
     spangc/ast/ast.c
     spangc/ast/ast_print.c
     spangc/parser/parser.c
