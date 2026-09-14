@@ -10,6 +10,7 @@ int main() {
     Parser parser = parser_init(&lexer);
     AST_Program *program = parse_program(&parser);
     parser_print_error(&parser);
+    program_print(program);
 
     lexer_free(&lexer);
     ast_program_free(program);

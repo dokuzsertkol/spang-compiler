@@ -274,6 +274,7 @@ struct AST_Node {
     };
 };
 
+static void ast_program_clear(AST_Program *program);
 void ast_expression_free(AST_Expression *exp);
 void ast_field_free(AST_Field *fields, size_t count);
 void ast_block_free(AST_Block *block);
@@ -281,3 +282,17 @@ void ast_program_free(AST_Program *program);
 void ast_node_free(AST_Node *node);
 int block_add_statement(AST_Block *block, AST_Node *statement);
 int program_add_statement(AST_Program *program, AST_Node *statement);
+
+// debug
+#define AST_PRINT_MAX_DEPTH 256
+typedef struct {
+    bool branch[AST_PRINT_MAX_DEPTH];
+    size_t depth;
+} AST_PrintContext;
+
+static void node_print(AST_Node *node, AST_PrintContext *ctx, bool last);
+static void expression_print(AST_Expression *expression, AST_PrintContext *ctx, bool last);
+static void location_print(AST_Location *location, AST_PrintContext *ctx, bool last);
+static void block_print(AST_Block *block, AST_PrintContext *ctx, bool last);
+static void field_print(AST_Field *field, AST_PrintContext *ctx, bool last);
+void program_print(AST_Program *program);
