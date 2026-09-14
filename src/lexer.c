@@ -4,40 +4,67 @@
 #include "lexer.h"
 #include "token.h"
 
-static const char *get_source(const char *path) {
-    FILE *input = fopen(path, "r");
-
+static char *get_source(const char *path) {
+    FILE *input = fopen(path, "rb");
     if (!input) {
-        perror("fopen");
+        perror(path);
         return NULL;
     }
 
-    fseek(input, 0, SEEK_END);
+    if (fseek(input, 0, SEEK_END) != 0) {
+        fclose(input);
+        return NULL;
+    }
+
     long size = ftell(input);
+    if (size < 0) {
+        fclose(input);
+        return NULL;
+    }
+
     rewind(input);
 
-    char *source = malloc(size + 1);
+    char *source = malloc((size_t)size + 1);
     if (!source) {
         fclose(input);
         return NULL;
     }
 
-    fread(source, 1, size, input);
-    source[size] = '\0';
+    size_t read = fread(source, 1, (size_t)size, input);
+    if (read != (size_t)size && ferror(input)) {
+        free(source);
+        fclose(input);
+        return NULL;
+    }
+
+    source[read] = '\0';
 
     fclose(input);
 
     return source;
 }
 
-Lexer lexer_init(const char *path) {
-    return (Lexer) {
+int lexer_init(Lexer *lexer, const char *path) {
+    char *source = get_source(path);
+    if (!source) return 0;
+
+    *lexer = (Lexer) {
         .path = path,
-        .source = get_source(path),
-        .current = get_source(path),
+        .source = source,
+        .current = source,
         .line = 1,
         .column = 1,
     };
+
+    return 1;
+}
+
+void lexer_free(Lexer *lexer) {
+    if (!lexer) return;
+
+    free(lexer->source);
+    lexer->source = NULL;
+    lexer->current = NULL;
 }
 
 static int is_identifier_start(const char c) {
@@ -389,7 +416,6 @@ static Token lexer_punctuation(Lexer *lexer) {
 }
 
 Token lexer_next_token(Lexer *lexer) {
-
     if (!lexer_skip_whitespace_and_comments(lexer)) {
         return (Token) {
             .type = TOKEN_ERROR,

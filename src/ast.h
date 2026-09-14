@@ -277,7 +277,7 @@ struct AST_Node {
 void ast_expression_free(AST_Expression *exp);
 void ast_field_free(AST_Field *fields, size_t count);
 void ast_block_free(AST_Block *block);
-void ast_program_free(AST_Program *block);
+void ast_program_free(AST_Program *program);
 void ast_node_free(AST_Node *node);
 int block_add_statement(AST_Block *block, AST_Node *statement);
 int program_add_statement(AST_Program *program, AST_Node *statement);

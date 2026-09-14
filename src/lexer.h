@@ -3,14 +3,16 @@
 
 typedef struct {
     const char *path;
-    const char *source;
+    
+    char *source;
     const char *current;
 
     size_t line;
     size_t column;
 } Lexer;
 
-Lexer lexer_init(const char* source);
+int lexer_init(Lexer *lexer, const char *path);
+void lexer_free(Lexer *lexer);
 Token lexer_next_token(Lexer* lexer);
 
 // debug
