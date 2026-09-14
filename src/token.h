@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 typedef enum {
     TOKEN_EOF,
@@ -95,3 +96,5 @@ int token_to_c4(const Token *token, uint32_t *value);
 uint8_t *token_to_s1(const Token *token, size_t *length);
 uint16_t *token_to_s2(const Token *token, size_t *length);
 uint32_t *token_to_s4(const Token *token, size_t *length);
+
+const char *token_type_to_string(const TokenType tokenType);

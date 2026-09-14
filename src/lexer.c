@@ -1,12 +1,40 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "lexer.h"
 #include "token.h"
 
-Lexer lexer_init(const char *source) {
+static const char *get_source(const char *path) {
+    FILE *input = fopen(path, "r");
+
+    if (!input) {
+        perror("fopen");
+        return NULL;
+    }
+
+    fseek(input, 0, SEEK_END);
+    long size = ftell(input);
+    rewind(input);
+
+    char *source = malloc(size + 1);
+    if (!source) {
+        fclose(input);
+        return NULL;
+    }
+
+    fread(source, 1, size, input);
+    source[size] = '\0';
+
+    fclose(input);
+
+    return source;
+}
+
+Lexer lexer_init(const char *path) {
     return (Lexer) {
-        .source = source,
-        .current = source,
+        .path = path,
+        .source = get_source(path),
+        .current = get_source(path),
         .line = 1,
         .column = 1,
     };
@@ -406,78 +434,7 @@ void lexer_print(const Lexer *lexer) {
 
         printf("TOKEN: %zu:%zu ", token.line, token.column);
 
-        switch (token.type) {
-            case TOKEN_EOF: printf("EOF"); break;
-            case TOKEN_ERROR: printf("ERROR"); break;
-
-            case TOKEN_LEFT_BRACKET: printf("LEFT_BRACKET"); break;
-            case TOKEN_RIGHT_BRACKET: printf("RIGHT_BRACKET"); break;
-            case TOKEN_LEFT_BRACE: printf("LEFT_BRACE"); break;
-            case TOKEN_RIGHT_BRACE: printf("RIGHT_BRACE"); break;
-            case TOKEN_LEFT_PAREN: printf("LEFT_PAREN"); break;
-            case TOKEN_RIGHT_PAREN: printf("RIGHT_PAREN"); break;
-
-            case TOKEN_SEMICOLON: printf("SEMICOLON"); break;
-            case TOKEN_DOT: printf("DOT"); break;
-            case TOKEN_COMMA: printf("COMMA"); break;
-
-            case TOKEN_PLUS: printf("PLUS"); break;
-            case TOKEN_MINUS: printf("MINUS"); break;
-            case TOKEN_ASTER: printf("ASTERIX"); break;
-            case TOKEN_SLASH: printf("SLASH"); break;
-
-            case TOKEN_EQUAL: printf("EQUAL"); break;
-            case TOKEN_EQUAL_EQUAL: printf("EQUAL_EQUAL"); break;
-            case TOKEN_NOT_EQUAL: printf("NOT_EQUAL"); break;
-            case TOKEN_LESS: printf("LESS"); break;
-            case TOKEN_GREATER: printf("GREATER"); break;
-            case TOKEN_LESS_EQUAL: printf("LESS_EQUAL"); break;
-            case TOKEN_GREATER_EQUAL: printf("GREATER_EQUAL"); break;
-            case TOKEN_AMPERS_AMPERS: printf("AMPERS_AMPERS"); break;
-            case TOKEN_BAR_BAR: printf("BAR_BAR"); break;
-            case TOKEN_EXCLAM: printf("EXCLAM"); break;
-
-            case TOKEN_RETURN: printf("RETURN"); break;
-            case TOKEN_IF: printf("IF"); break;
-            case TOKEN_ELSE: printf("ELSE"); break;
-            case TOKEN_WHILE: printf("WHILE"); break;
-            case TOKEN_BREAK: printf("BREAK"); break;
-            case TOKEN_CONTINUE: printf("CONTINUE"); break;
-            case TOKEN_STRUCT: printf("STRUCT"); break;
-
-
-            case TOKEN_I1: printf("I1"); break;
-            case TOKEN_I2: printf("I2"); break;
-            case TOKEN_I4: printf("I4"); break;
-            case TOKEN_I8: printf("I8"); break;
-            case TOKEN_U1: printf("U1"); break;
-            case TOKEN_U2: printf("U2"); break;
-            case TOKEN_U4: printf("U4"); break;
-            case TOKEN_U8: printf("U8"); break;
-            case TOKEN_C1: printf("C1"); break;
-            case TOKEN_C2: printf("C2"); break;
-            case TOKEN_C4: printf("C4"); break;
-            case TOKEN_F4: printf("F4"); break;
-            case TOKEN_F8: printf("F8"); break;
-            case TOKEN_B1: printf("B1"); break;
-            case TOKEN_V0: printf("V0"); break;
-
-            case TOKEN_INT_LITERAL: printf("INT_LITERAL"); break;
-            case TOKEN_FLOAT_LITERAL: printf("FLOAT_LITERAL"); break;
-            case TOKEN_C1_LITERAL: printf("C1_LITERAL"); break;
-            case TOKEN_C2_LITERAL: printf("C2_LITERAL"); break;
-            case TOKEN_C4_LITERAL: printf("C4_LITERAL"); break;
-            case TOKEN_S1_LITERAL: printf("S1_LITERAL"); break;
-            case TOKEN_S2_LITERAL: printf("S2_LITERAL"); break;
-            case TOKEN_S4_LITERAL: printf("S4_LITERAL"); break;
-            case TOKEN_TRUE: printf("TRUE"); break;
-            case TOKEN_FALSE: printf("FALSE"); break;
-            case TOKEN_IDENTIFIER: printf("IDENTIFIER"); break;
-            case TOKEN_SP: printf("SP"); break;
-            case TOKEN_FP: printf("FP"); break;
-            case TOKEN_BP: printf("BP"); break;
-            case TOKEN_HP: printf("HP"); break;
-        }
+        printf("%s", token_type_to_string(token.type));
 
         if (token.type != TOKEN_EOF) {
             printf(" \"");

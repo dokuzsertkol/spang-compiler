@@ -2,17 +2,25 @@
 #include "ast.h"
 #include "token.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 Parser parser_init(Lexer *lexer) {
-    return (Parser) {
+    Parser parser = {
         .lexer = lexer,
-        .current = lexer_next_token(lexer)
+        .current = {0},
+        .hasError = 0,
     };
+    parser_next(&parser);
+    return parser;
 }
 
 static int parser_next(Parser *parser) {
     parser->current = lexer_next_token(parser->lexer);
-    return parser->current.type != TOKEN_ERROR; 
+    if (parser->current.type == TOKEN_ERROR) {
+        parser_error(parser, PARSER_ERROR_INVALID_TOKEN);
+        return 0;
+    }
+    return 1;
 }
 
 static int parser_match(Parser *parser, TokenType type) {
@@ -23,14 +31,17 @@ static int parser_match(Parser *parser, TokenType type) {
 static int parse_location(Parser *parser, AST_Location *loc) {
     *loc = (AST_Location){0};
 
-    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) return 0;
+    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_BRACKET);
+        return 0;
+    }
 
     switch (parser->current.type) {
         case TOKEN_SP: loc->base = AST_LOCATION_SP; break;
         case TOKEN_FP: loc->base = AST_LOCATION_FP; break;
         case TOKEN_BP: loc->base = AST_LOCATION_BP; break;
         case TOKEN_HP: loc->base = AST_LOCATION_HP; break;
-        default: return 0;
+        default: parser_error(parser, PARSER_ERROR_EXPECTED_BASE); return 0;
     }
 
     if (!parser_next(parser)) return 0;
@@ -42,6 +53,7 @@ static int parse_location(Parser *parser, AST_Location *loc) {
 
     if (!parser_match(parser, TOKEN_COMMA)) {
         ast_expression_free(loc->offset);
+        parser_error(parser, PARSER_ERROR_EXPECTED_COMMA);
         return 0;
     }
 
@@ -56,6 +68,7 @@ static int parse_location(Parser *parser, AST_Location *loc) {
     if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
         ast_expression_free(loc->offset);
         ast_expression_free(loc->size);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_BRACKET);
         return 0;
     }
 
@@ -66,15 +79,22 @@ static int parse_field(Parser *parser, AST_Field *field) {
     *field = (AST_Field){0};
     
     Token identifier = parser->current;
-    if (!parser_match(parser, TOKEN_IDENTIFIER)) return 0;
+    if (!parser_match(parser, TOKEN_IDENTIFIER)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_IDENTIFIER);
+        return 0;
+    }
 
-    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) return 0;
+    if (!parser_match(parser, TOKEN_LEFT_BRACKET)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_BRACKET);
+        return 0;
+    }
 
     field->offset = parse_expression(parser);
     if (!field->offset) return 0;
 
     if (!parser_match(parser, TOKEN_COMMA)) {
         ast_expression_free(field->offset);
+        parser_error(parser, PARSER_ERROR_EXPECTED_COMMA);
         return 0;
     }
 
@@ -89,6 +109,7 @@ static int parse_field(Parser *parser, AST_Field *field) {
     if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
         ast_expression_free(field->offset);
         ast_expression_free(field->size);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_BRACKET);
         return 0;
     }
 
@@ -168,6 +189,7 @@ static AST_Expression *parse_literal(Parser *parser) {
             break;
 
         default:
+            parser_error(parser, PARSER_ERROR_EXPECTED_EXPRESSION);
             free(exp);
             return NULL;
     }
@@ -199,13 +221,17 @@ static AST_Expression *parse_identifier(Parser *parser) {
 }
 
 static AST_Expression *parse_parenthesized(Parser *parser) {
-    if (!parser_match(parser, TOKEN_LEFT_PAREN)) return NULL;
+    if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_PAREN);
+        return NULL;
+    }
 
     AST_Expression *exp = parse_expression(parser);
     if (!exp) return NULL;
 
     if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
         ast_expression_free(exp);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_PAREN);
         return NULL;
     }
 
@@ -234,7 +260,7 @@ static AST_Expression *parse_data_type(Parser *parser) {
         case TOKEN_F8: exp->dataType = AST_DATA_F8; break;
         case TOKEN_B1: exp->dataType = AST_DATA_B1; break;
         case TOKEN_V0: exp->dataType = AST_DATA_V0; break;
-        default: ast_expression_free(exp); return NULL;
+        default: parser_error(parser, PARSER_ERROR_EXPECTED_EXPRESSION); ast_expression_free(exp); return NULL;
     }
     if (!parser_next(parser)) {
         ast_expression_free(exp);
@@ -245,7 +271,10 @@ static AST_Expression *parse_data_type(Parser *parser) {
 }
 
 static AST_Expression *parse_sp(Parser *parser) {
-    if(!parser_match(parser, TOKEN_SP)) return NULL;
+    if(!parser_match(parser, TOKEN_SP)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
     AST_Expression *exp = malloc(sizeof(*exp));
     if (!exp) return NULL;
@@ -273,13 +302,15 @@ static AST_Expression *parse_primary(Parser *parser) {
     
         case TOKEN_SP: return parse_sp(parser);
 
-        default: return NULL;
+        default: 
+        parser_error(parser, PARSER_ERROR_EXPECTED_EXPRESSION); return NULL;
     }
 }
 
 static AST_Expression *parse_location_access(Parser *parser, AST_Expression *exp) {
     if (!parser_match(parser, TOKEN_LEFT_BRACKET)) {
         ast_expression_free(exp);
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_BRACKET);
         return NULL;
     }
 
@@ -292,6 +323,7 @@ static AST_Expression *parse_location_access(Parser *parser, AST_Expression *exp
     if (!parser_match(parser, TOKEN_COMMA)) {
         ast_expression_free(exp);
         ast_expression_free(offset);
+        parser_error(parser, PARSER_ERROR_EXPECTED_COMMA);
         return NULL;
     }
 
@@ -308,6 +340,7 @@ static AST_Expression *parse_location_access(Parser *parser, AST_Expression *exp
         ast_expression_free(exp);
         ast_expression_free(offset);
         ast_expression_free(size);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_BRACKET);
         return NULL;
     }
 
@@ -337,6 +370,7 @@ static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) 
 
     if (!parser_match(parser, TOKEN_IDENTIFIER)) {
         ast_expression_free(exp);
+        parser_error(parser, PARSER_ERROR_EXPECTED_IDENTIFIER);
         return NULL;
     }
 
@@ -361,6 +395,7 @@ static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) 
 static AST_Expression *parse_call(Parser *parser, AST_Expression *exp) {
     if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
         ast_expression_free(exp);
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_PAREN);
         return NULL;
     }
 
@@ -411,8 +446,13 @@ static AST_Expression *parse_call(Parser *parser, AST_Expression *exp) {
         func->call.arguments[func->call.argumentCount++] = arg;
 
         if (parser->current.type == TOKEN_COMMA) {
-            if (!parser_next(parser) || parser->current.type == TOKEN_RIGHT_PAREN) {
+            if (!parser_next(parser)) {
                 ast_expression_free(func);
+                return NULL;
+            }
+            if (parser->current.type == TOKEN_RIGHT_PAREN) {
+                ast_expression_free(func);
+                parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
                 return NULL;
             }
         }
@@ -421,6 +461,7 @@ static AST_Expression *parse_call(Parser *parser, AST_Expression *exp) {
 
     if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
         ast_expression_free(func);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_PAREN);
         return NULL;
     }
 
@@ -441,6 +482,7 @@ static AST_Expression *parse_postfix(Parser *parser) {
             case TOKEN_DOT:
                 if (!parser_match(parser, TOKEN_DOT)) {
                     ast_expression_free(exp);
+                    parser_error(parser, PARSER_ERROR_EXPECTED_DOT);
                     return NULL;
                 }
 
@@ -778,7 +820,6 @@ static AST_Block *parse_statement_or_block(Parser *parser) {
         }
 
         while (parser->current.type != TOKEN_RIGHT_BRACE && parser->current.type != TOKEN_EOF) {
-
             AST_Node *statement = parse_statement(parser);
             if (!statement) {
                 ast_block_free(block);
@@ -794,6 +835,7 @@ static AST_Block *parse_statement_or_block(Parser *parser) {
 
         if (!parser_match(parser, TOKEN_RIGHT_BRACE)) {
             ast_block_free(block);
+            parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_BRACE);
             return NULL;
         }
     }
@@ -829,6 +871,7 @@ static AST_Node *parse_variable_assignment(Parser *parser, AST_Expression *targe
     if (!parser_match(parser, TOKEN_SEMICOLON)) {
         ast_expression_free(target);
         ast_expression_free(exp);
+            parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -853,6 +896,7 @@ static AST_Node *parse_variable_assignment(Parser *parser, AST_Expression *targe
 static AST_Node *parse_variable_declaration(Parser *parser, AST_Expression *target) {
     if (target->type != AST_EX_VARIABLE) {
         ast_expression_free(target);
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL; 
     }
 
@@ -885,6 +929,7 @@ static AST_Node *parse_variable_declaration(Parser *parser, AST_Expression *targ
         ast_expression_free(loc.offset);
         ast_expression_free(loc.size);
         ast_expression_free(initializer);
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -913,6 +958,7 @@ static AST_Node *parse_variable_declaration(Parser *parser, AST_Expression *targ
 static AST_Node *parse_expression_statement(Parser *parser, AST_Expression *target) {
     if (!parser_match(parser, TOKEN_SEMICOLON)) {
         ast_expression_free(target);
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -942,7 +988,7 @@ static AST_Node *parse_identifier_statement(Parser *parser) {
 
         case TOKEN_SEMICOLON: return parse_expression_statement(parser, target);
 
-        default: ast_expression_free(target); return NULL;
+        default: ast_expression_free(target); parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN); return NULL;
     }
 }
 
@@ -953,6 +999,7 @@ static AST_Node *parse_location_assignment(Parser *parser) {
     if(!parser_match(parser, TOKEN_EQUAL)) {
         ast_expression_free(loc.offset);
         ast_expression_free(loc.size);
+        parser_error(parser, PARSER_ERROR_EXPECTED_ASSIGNMENT);
         return NULL;
     }
 
@@ -967,6 +1014,7 @@ static AST_Node *parse_location_assignment(Parser *parser) {
         ast_expression_free(loc.offset);
         ast_expression_free(loc.size);
         ast_expression_free(exp);
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -1000,12 +1048,21 @@ static AST_Node *parse_location_assignment(Parser *parser) {
 }
 
 static AST_Node *parse_struct_declaration(Parser *parser) {
-    if (!parser_match(parser, TOKEN_STRUCT)) return NULL;
+    if (!parser_match(parser, TOKEN_STRUCT)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
     Token identifier = parser->current;
-    if (!parser_match(parser, TOKEN_IDENTIFIER)) return NULL;
+    if (!parser_match(parser, TOKEN_IDENTIFIER)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_IDENTIFIER);
+        return NULL;
+    }
 
-    if (!parser_match(parser, TOKEN_LEFT_BRACE)) return NULL;
+    if (!parser_match(parser, TOKEN_LEFT_BRACE)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_BRACE);
+        return NULL;
+    }
 
     AST_Node *node = malloc(sizeof(*node));
     if (!node) return NULL;
@@ -1061,6 +1118,7 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
 
     if (!parser_match(parser, TOKEN_RIGHT_BRACE)) {
         ast_node_free(node);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_BRACE);
         return NULL;
     }
 
@@ -1068,12 +1126,21 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
 }
 
 static AST_Node *parse_function_declaration(Parser *parser) {
-    if(!parser_match(parser, TOKEN_FP)) return NULL;
+    if(!parser_match(parser, TOKEN_FP)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
     Token identifier = parser->current;
-    if(!parser_match(parser, TOKEN_IDENTIFIER)) return NULL;
+    if (!parser_match(parser, TOKEN_IDENTIFIER)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_IDENTIFIER);
+        return NULL;
+    }
 
-    if (!parser_match(parser, TOKEN_LEFT_PAREN)) return NULL;
+    if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_PAREN);
+        return NULL;
+    }
 
     AST_Node *node = malloc(sizeof(*node));
     if (!node) return NULL;
@@ -1121,8 +1188,13 @@ static AST_Node *parse_function_declaration(Parser *parser) {
         node->functionDeclaration.parameters[node->functionDeclaration.parameterCount++] = field;
 
         if (parser->current.type == TOKEN_COMMA) {
-            if (!parser_next(parser) || parser->current.type == TOKEN_RIGHT_PAREN) {
+            if (!parser_next(parser)) {
                 ast_node_free(node);
+                return NULL;
+            }
+            if (parser->current.type == TOKEN_RIGHT_PAREN) {
+                ast_node_free(node);
+                parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
                 return NULL;
             }
         } else break;
@@ -1130,12 +1202,14 @@ static AST_Node *parse_function_declaration(Parser *parser) {
 
     if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
         ast_node_free(node);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_PAREN);
         return NULL;
     }
 
     // parse size
     if (!parser_match(parser, TOKEN_LEFT_BRACKET)) {
         ast_node_free(node);
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_BRACKET);
         return NULL;
     }
     AST_Expression *size = parse_expression(parser);
@@ -1147,6 +1221,7 @@ static AST_Node *parse_function_declaration(Parser *parser) {
 
     if (!parser_match(parser, TOKEN_RIGHT_BRACKET)) {
         ast_node_free(node);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_BRACKET);
         return NULL;
     }
 
@@ -1161,7 +1236,10 @@ static AST_Node *parse_function_declaration(Parser *parser) {
 }
 
 static AST_Node *parse_return_statement(Parser *parser) {
-    if(!parser_match(parser, TOKEN_RETURN)) return NULL;
+    if(!parser_match(parser, TOKEN_RETURN)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
     AST_Expression *value = NULL;
 
@@ -1172,6 +1250,7 @@ static AST_Node *parse_return_statement(Parser *parser) {
 
     if (!parser_match(parser, TOKEN_SEMICOLON)) {
         ast_expression_free(value);
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -1191,15 +1270,22 @@ static AST_Node *parse_return_statement(Parser *parser) {
 }
 
 static AST_Node *parse_if_statement(Parser *parser) {
-    if (!parser_next(parser)) return NULL; // skip if
+    if (!parser_match(parser, TOKEN_IF)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
-    if (!parser_match(parser, TOKEN_LEFT_PAREN)) return NULL;
+    if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_PAREN);
+        return NULL;
+    }
 
     AST_Expression *condition = parse_expression(parser);
     if (!condition) return NULL;
 
     if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
         ast_expression_free(condition);
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_PAREN);
         return NULL;
     }
 
@@ -1240,14 +1326,21 @@ static AST_Node *parse_if_statement(Parser *parser) {
 }
 
 static AST_Node *parse_while_statement(Parser *parser) {
-    if (!parser_next(parser)) return NULL; // skip while
+    if (!parser_match(parser, TOKEN_WHILE)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
-    if (!parser_match(parser, TOKEN_LEFT_PAREN)) return NULL;
+    if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_PAREN);
+        return NULL;
+    }
 
     AST_Expression *condition = parse_expression(parser);
     if (!condition) return NULL;
 
     if (!parser_match(parser, TOKEN_RIGHT_PAREN)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_RIGHT_PAREN);
         ast_expression_free(condition);
         return NULL;
     }
@@ -1277,9 +1370,15 @@ static AST_Node *parse_while_statement(Parser *parser) {
 }
 
 static AST_Node *parse_break_statement(Parser *parser) {
-    if (!parser_match(parser, TOKEN_BREAK)) return NULL;
+    if (!parser_match(parser, TOKEN_BREAK)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
-    if (!parser_match(parser, TOKEN_SEMICOLON)) return NULL;
+    if (!parser_match(parser, TOKEN_SEMICOLON)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
+        return NULL;
+    }
 
     AST_Node *node = malloc(sizeof(*node));
     if (!node) return NULL;
@@ -1290,9 +1389,15 @@ static AST_Node *parse_break_statement(Parser *parser) {
 }
 
 static AST_Node *parse_continue_statement(Parser *parser) {
-    if (!parser_match(parser, TOKEN_CONTINUE)) return NULL;
+    if (!parser_match(parser, TOKEN_CONTINUE)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
 
-    if (!parser_match(parser, TOKEN_SEMICOLON)) return NULL;
+    if (!parser_match(parser, TOKEN_SEMICOLON)) {
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
+        return NULL;
+    }
 
     AST_Node *node = malloc(sizeof(*node));
     if (!node) return NULL;
@@ -1304,6 +1409,7 @@ static AST_Node *parse_continue_statement(Parser *parser) {
 static AST_Node *parse_sp_assignment(Parser *parser, AST_Expression *target) {
     if(!parser_match(parser, TOKEN_EQUAL)) {
         ast_expression_free(target);
+        parser_error(parser, PARSER_ERROR_EXPECTED_ASSIGNMENT);
         return NULL;
     }
 
@@ -1316,6 +1422,7 @@ static AST_Node *parse_sp_assignment(Parser *parser, AST_Expression *target) {
     if (!parser_match(parser, TOKEN_SEMICOLON)) {
         ast_expression_free(value);
         ast_expression_free(target);
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -1339,6 +1446,7 @@ static AST_Node *parse_sp_assignment(Parser *parser, AST_Expression *target) {
 static AST_Node *parse_sp_location(Parser *parser, AST_Expression *target) {
     if (target->type != AST_EX_SP) {
         ast_expression_free(target);
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
     }
     ast_expression_free(target);
@@ -1368,6 +1476,7 @@ static AST_Node *parse_sp_location(Parser *parser, AST_Expression *target) {
         ast_expression_free(initializer);
         ast_expression_free(loc.size);
         ast_expression_free(loc.offset);
+        parser_error(parser, PARSER_ERROR_EXPECTED_SEMICOLON);
         return NULL;
     }
 
@@ -1398,7 +1507,7 @@ static AST_Node *parse_sp_statement(Parser *parser) {
 
         case TOKEN_EQUAL: return parse_sp_assignment(parser, target);
 
-        default: ast_expression_free(target); return NULL;
+        default: ast_expression_free(target); parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN); return NULL;
     }
 }
 
@@ -1424,22 +1533,18 @@ static AST_Node *parse_statement(Parser *parser) {
 
         case TOKEN_SP: return parse_sp_statement(parser); 
 
-        default: return NULL;
+        default: parser_error(parser, PARSER_ERROR_INVALID_STATEMENT); return NULL;
     }
 }
 
 AST_Program *parse_program(Parser *parser) {
+    if (parser->hasError) return NULL;
+    
     AST_Program *program = malloc(sizeof(*program));
     if (!program) return NULL;
     *program = (AST_Program){0};
 
-    while (parser->current.type != TOKEN_EOF) {
-
-        if (parser->current.type == TOKEN_ERROR) {
-            ast_program_free(program);
-            return NULL;
-        }
-
+    while (parser->current.type != TOKEN_EOF && !parser->hasError) {
         AST_Node *statement = parse_statement(parser);
         if (!statement) {
             ast_program_free(program);
@@ -1453,5 +1558,112 @@ AST_Program *parse_program(Parser *parser) {
         }
     }
 
+    if (parser->hasError) {
+        ast_program_free(program);
+        return NULL;
+    }
+
     return program;
+}
+
+// error
+static void parser_error_at(Parser *parser, ParserErrorType type, const char *message, Token token) {
+    if (parser->hasError) return;
+
+    parser->hasError = true;
+
+    parser->error = (ParserError) {
+        .type = type,
+        .token = token,
+        .message = message,
+    };
+}
+
+static void parser_error(Parser *parser, ParserErrorType type) {
+    const char *message = NULL;
+
+    switch (type) {
+        case PARSER_ERROR_UNEXPECTED_TOKEN:
+            message = "unexpected token";
+            break;
+
+        case PARSER_ERROR_EXPECTED_EXPRESSION:
+            message = "expected expression";
+            break;
+
+        case PARSER_ERROR_EXPECTED_IDENTIFIER:
+            message = "expected identifier";
+            break;
+
+        case PARSER_ERROR_EXPECTED_SEMICOLON:
+            message = "expected ';'";
+            break;
+
+        case PARSER_ERROR_EXPECTED_COMMA:
+            message = "expected ','";
+            break;
+
+        case PARSER_ERROR_EXPECTED_LEFT_BRACKET:
+            message = "expected '['";
+            break;
+
+        case PARSER_ERROR_EXPECTED_RIGHT_BRACKET:
+            message = "expected ']'";
+            break;
+
+        case PARSER_ERROR_EXPECTED_LEFT_PAREN:
+            message = "expected '('";
+            break;
+
+        case PARSER_ERROR_EXPECTED_RIGHT_PAREN:
+            message = "expected ')'";
+            break;
+
+        case PARSER_ERROR_EXPECTED_LEFT_BRACE:
+            message = "expected '{'";
+            break;
+
+        case PARSER_ERROR_EXPECTED_RIGHT_BRACE:
+            message = "expected '}'";
+            break;
+
+        case PARSER_ERROR_EXPECTED_ASSIGNMENT:
+            message = "expected '='";
+            break;
+            
+        case PARSER_ERROR_EXPECTED_DOT:
+            message = "expected '.'";
+            break;
+
+        case PARSER_ERROR_EXPECTED_BASE:
+            message = "expected one of 'fp', 'sp', 'hp' or 'bp'";
+            break;
+
+        case PARSER_ERROR_INVALID_STATEMENT:
+            message = "invalid statement";
+            break;
+        
+        case PARSER_ERROR_INVALID_TOKEN:
+            message = "invalid token";
+            break;
+        }
+
+    parser_error_at(parser, type, message, parser->current);
+}
+
+void parser_print_error(const Parser *parser) {
+    if (!parser || !parser->hasError) return;
+
+    const ParserError *error = &parser->error;
+
+    fprintf(
+        stderr,
+        "%s:%zu:%zu: error: %s",
+        parser->lexer->path,
+        error->token.line,
+        error->token.column,
+        error->message
+    );
+
+    fprintf(stderr, ", got '%.*s'\n", (int) error->token.length, error->token.start);
 }

@@ -117,6 +117,8 @@ void ast_node_free(AST_Node *node) {
 }
 
 int block_add_statement(AST_Block *block, AST_Node *statement) {
+    if (!block) return 0;
+
     if (block->count >= block->capacity) {
         int newCapacity = block->capacity == 0 ? 8 : block->capacity * 2;
 
@@ -132,6 +134,8 @@ int block_add_statement(AST_Block *block, AST_Node *statement) {
 }
 
 int program_add_statement(AST_Program *program, AST_Node *statement) {
+    if (!program) return 0;
+    
     if (program->count >= program->capacity) {
         int newCapacity = program->capacity == 0 ? 8 : program->capacity * 2;
 

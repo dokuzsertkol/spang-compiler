@@ -2,7 +2,8 @@
 #include "token.h"
 
 typedef struct {
-    const char* source;
+    const char *path;
+    const char *source;
     const char *current;
 
     size_t line;
