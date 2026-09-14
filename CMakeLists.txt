@@ -13,6 +13,7 @@ add_executable(spangc
     spangc/ast/ast.c
     spangc/ast/ast_print.c
     spangc/parser/parser.c
+    spangc/parser/parser_error.c
 )
 
 target_include_directories(spangc PRIVATE ${PROJECT_SOURCE_DIR}/spangc)

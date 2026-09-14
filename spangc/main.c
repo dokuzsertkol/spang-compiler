@@ -1,11 +1,9 @@
-#include "ast/ast_print.h"
-#include "lexer/lexer_print.h"
 #include "parser/parser.h"
 
 int main() {
     Lexer lexer;
     if(!lexer_init(&lexer, "./input/main.spg")) return 0;
-    lexer_print(&lexer);
+    // lexer_print(&lexer);
 
     Parser parser = parser_init(&lexer);
     AST_Program *program = parse_program(&parser);

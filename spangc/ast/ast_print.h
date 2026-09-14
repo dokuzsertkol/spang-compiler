@@ -1,3 +1,4 @@
+#pragma once
 #include "ast.h"
 
 #define AST_PRINT_MAX_DEPTH 256
