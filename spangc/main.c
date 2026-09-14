@@ -1,3 +1,4 @@
+#include "ast/ast_print.h"
 #include "parser/parser.h"
 
 int main() {
