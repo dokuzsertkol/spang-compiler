@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include "ast_print.h"
 
+static void expression_print(AST_Expression *expression,AST_PrintContext *ctx, bool last);
+static void node_print(AST_Node *node, AST_PrintContext *ctx, bool last);
+
 static AST_PrintContext tree_child(AST_PrintContext *ctx, bool parentLast) {
     AST_PrintContext child = *ctx;
 

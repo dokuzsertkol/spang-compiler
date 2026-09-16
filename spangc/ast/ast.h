@@ -274,7 +274,6 @@ struct AST_Node {
     };
 };
 
-static void ast_program_clear(AST_Program *program);
 void ast_expression_free(AST_Expression *exp);
 void ast_field_free(AST_Field *fields, size_t count);
 void ast_block_free(AST_Block *block);

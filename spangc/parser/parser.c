@@ -1,15 +1,8 @@
 #include "parser.h"
 #include <stdlib.h>
 
-Parser parser_init(Lexer *lexer) {
-    Parser parser = {
-        .lexer = lexer,
-        .current = {0},
-        .hasError = 0,
-    };
-    parser_next(&parser);
-    return parser;
-}
+static AST_Expression *parse_expression(Parser *parser);
+static AST_Node *parse_statement(Parser *parser);
 
 static int parser_next(Parser *parser) {
     parser->current = lexer_next_token(parser->lexer);
@@ -18,6 +11,16 @@ static int parser_next(Parser *parser) {
         return 0;
     }
     return 1;
+}
+
+Parser parser_init(Lexer *lexer) {
+    Parser parser = {
+        .lexer = lexer,
+        .current = {0},
+        .hasError = 0,
+    };
+    parser_next(&parser);
+    return parser;
 }
 
 static int parser_match(Parser *parser, TokenType type) {

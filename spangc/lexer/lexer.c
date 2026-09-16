@@ -3,21 +3,6 @@
 #include <stdio.h>
 #include "lexer.h"
 
-int lexer_init(Lexer *lexer, const char *path) {
-    char *source = get_source(path);
-    if (!source) return 0;
-
-    *lexer = (Lexer) {
-        .path = path,
-        .source = source,
-        .current = source,
-        .line = 1,
-        .column = 1,
-    };
-
-    return 1;
-}
-
 static char *get_source(const char *path) {
     FILE *input = fopen(path, "rb");
     if (!input) {
@@ -56,6 +41,21 @@ static char *get_source(const char *path) {
     fclose(input);
 
     return source;
+}
+
+int lexer_init(Lexer *lexer, const char *path) {
+    char *source = get_source(path);
+    if (!source) return 0;
+
+    *lexer = (Lexer) {
+        .path = path,
+        .source = source,
+        .current = source,
+        .line = 1,
+        .column = 1,
+    };
+
+    return 1;
 }
 
 static int is_identifier_start(const char c) {

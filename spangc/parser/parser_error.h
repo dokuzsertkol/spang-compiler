@@ -28,6 +28,5 @@ typedef struct {
     const char *message;
 } ParserError;
 
-static int parser_next(Parser *parser);
 void parser_error(Parser *parser, ParserErrorType type);
 void parser_print_error(const Parser *parser);
