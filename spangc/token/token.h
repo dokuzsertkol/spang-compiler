@@ -41,6 +41,7 @@ typedef enum {
     TOKEN_BREAK,
     TOKEN_CONTINUE,
     TOKEN_STRUCT,
+    TOKEN_INCLUDE,
 
     TOKEN_I1,
     TOKEN_I2,

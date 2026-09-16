@@ -1,5 +1,9 @@
-#include "parser.h"
+#include <string.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include "parser.h"
+#include "include/include_resolver.h"
+#include "parser_error.h"
 
 static AST_Expression *parse_expression(Parser *parser);
 static AST_Node *parse_statement(Parser *parser);
@@ -13,14 +17,31 @@ static int parser_next(Parser *parser) {
     return 1;
 }
 
-Parser parser_init(Lexer *lexer) {
-    Parser parser = {
+Parser *parser_init(Lexer *lexer) {
+    Parser *parser = malloc(sizeof(*parser));
+    if (!parser) return NULL;
+
+    *parser = (Parser) {
         .lexer = lexer,
         .current = {0},
         .hasError = 0,
     };
-    parser_next(&parser);
+    parser_next(parser);
+    
+    parser->resolver = include_resolver_init(parser);
+    if(!parser->resolver) {
+        parser_free(parser);
+        return NULL;
+    }
+    
     return parser;
+}
+
+void parser_free(Parser *parser) {
+    if (!parser) return;
+
+    include_resolver_free(parser->resolver);
+    free(parser);
 }
 
 static int parser_match(Parser *parser, TokenType type) {
@@ -113,9 +134,31 @@ static int parse_field(Parser *parser, AST_Field *field) {
         return 0;
     }
 
-    field->name = identifier.start;
+    field->name = strndup(identifier.start, identifier.length);
     field->length = identifier.length;
     return 1;
+}
+
+static int parse_include(Parser *parser, AST_Program *program, AST_Include *include) {
+    AST_Program *includedProgram = NULL;
+    switch (include_resolver_parse(parser->resolver, include->path, &includedProgram)) {
+        case INCLUDE_RESULT_SKIP:
+            return 1;
+
+        case INCLUDE_RESULT_ERROR:
+            return 0;
+
+        case INCLUDE_RESULT_SUCCESS:
+            if (!includedProgram) return 0;
+
+            if (!ast_program_append_program(program, includedProgram)) {
+                ast_program_free(includedProgram);
+                return 0;
+            }
+            
+            ast_program_free(includedProgram);
+            return 1;
+    }
 }
 
 static AST_Expression *parse_literal(Parser *parser) {
@@ -208,7 +251,7 @@ static AST_Expression *parse_identifier(Parser *parser) {
     *exp = (AST_Expression){
         .type = AST_EX_VARIABLE,
         .variable = (AST_Variable) {
-            .name = parser->current.start,
+            .name = strndup(parser->current.start, parser->current.length),
             .length = parser->current.length,
         },
     };
@@ -384,7 +427,7 @@ static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) 
         .type = AST_EX_MEMBER_ACCESS,
         .memberAccess = {
             .parent = exp,
-            .name = member.start,
+            .name = strndup(member.start, member.length),
             .length = member.length,
         },
     };
@@ -826,7 +869,7 @@ static AST_Block *parse_statement_or_block(Parser *parser) {
                 return NULL;
             }
 
-            if (!block_add_statement(block, statement)) {
+            if (!ast_block_add_statement(block, statement)) {
                 ast_node_free(statement);
                 ast_block_free(block);
                 return NULL;
@@ -846,7 +889,7 @@ static AST_Block *parse_statement_or_block(Parser *parser) {
             return NULL;
         }
 
-        if (!block_add_statement(block, statement)) {
+        if (!ast_block_add_statement(block, statement)) {
             ast_node_free(statement);
             ast_block_free(block);
             return NULL;
@@ -942,16 +985,18 @@ static AST_Node *parse_variable_declaration(Parser *parser, AST_Expression *targ
         return NULL; 
     }
 
+    AST_Variable variable = target->variable;
+    free(target);
+
     *node = (AST_Node) {
         .type = AST_VARIABLE_DECLARATION,
         .variableDeclaration = (AST_VariableDeclaration) {
             .location = loc,
-            .var = target->variable,
+            .var = variable,
             .initializer = initializer,
         }
     };
 
-    ast_expression_free(target);
     return node;
 }
 
@@ -1070,7 +1115,7 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
     *node = (AST_Node) {
         .type = AST_STRUCT_DECLARATION,
         .structDeclaration = {
-            .name = identifier.start,
+            .name = strndup(identifier.start, identifier.length),
             .length = identifier.length,
             .fields = NULL,
             .fieldCount = 0,
@@ -1148,7 +1193,7 @@ static AST_Node *parse_function_declaration(Parser *parser) {
     *node = (AST_Node) {
         .type = AST_FUNCTION_DECLARATION,
         .functionDeclaration = {
-            .name = identifier.start,
+            .name = strndup(identifier.start, identifier.length),
             .length = identifier.length,
             .parameters = NULL,
             .parameterCount = 0,
@@ -1511,6 +1556,42 @@ static AST_Node *parse_sp_statement(Parser *parser) {
     }
 }
 
+static AST_Node *parse_include_statement(Parser *parser) {
+    if (!parser_match(parser, TOKEN_INCLUDE)) {
+        parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
+        return NULL;
+    }
+
+    Token token = parser->current;
+
+    if (!parser_match(parser, TOKEN_S1_LITERAL)) {
+        parser_error(parser, PARSER_ERROR_INVALID_INCLUDE);
+        return NULL;
+    }
+
+    size_t length;
+    const char *tokenPath = (char *)token_to_s1(&token, &length);
+    if (!tokenPath) return NULL;
+
+    char *path = strndup(tokenPath, length);
+    if (!path) return NULL;
+
+    AST_Node *node = malloc(sizeof(*node));
+    if (!node) {
+        free(path);
+        return NULL;
+    }
+
+    *node = (AST_Node) {
+        .type = AST_INCLUDE,
+        .include = {
+            .path = path,
+        }
+    };
+
+    return node;
+}
+
 static AST_Node *parse_statement(Parser *parser) {
     switch (parser->current.type) {
         case TOKEN_IDENTIFIER: return parse_identifier_statement(parser);
@@ -1531,7 +1612,9 @@ static AST_Node *parse_statement(Parser *parser) {
 
         case TOKEN_CONTINUE: return parse_continue_statement(parser);
 
-        case TOKEN_SP: return parse_sp_statement(parser); 
+        case TOKEN_SP: return parse_sp_statement(parser);
+
+        case TOKEN_INCLUDE: return parse_include_statement(parser);
 
         default: parser_error(parser, PARSER_ERROR_INVALID_STATEMENT); return NULL;
     }
@@ -1551,7 +1634,17 @@ AST_Program *parse_program(Parser *parser) {
             return NULL;
         }
 
-        if (!program_add_statement(program, statement)) {
+        if (statement->type == AST_INCLUDE) {
+            if(!parse_include(parser, program, &statement->include)) {
+                ast_program_free(program);
+                ast_node_free(statement);
+                return NULL;
+            }
+            ast_node_free(statement);
+            continue;
+        }
+
+        if (!ast_program_add_statement(program, statement)) {
             ast_program_free(program);
             ast_node_free(statement);
             return NULL;

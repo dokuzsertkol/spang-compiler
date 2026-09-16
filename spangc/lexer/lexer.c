@@ -3,6 +3,21 @@
 #include <stdio.h>
 #include "lexer.h"
 
+char *get_canonical_path(const char* path) {
+    const char *dot = strrchr(path, '.');
+
+    if (!dot || strcmp(dot, ".spg") != 0) {
+        fprintf(stderr, "Error: expected a .spg source file\n");
+        return NULL;
+    }
+
+    char *canonicalPath = realpath(path, NULL);
+    if (!canonicalPath) {
+        fprintf(stderr, "Error: included file not found: %s\n", path);
+    }
+    return canonicalPath;
+}
+
 static char *get_source(const char *path) {
     FILE *input = fopen(path, "rb");
     if (!input) {
@@ -30,7 +45,8 @@ static char *get_source(const char *path) {
     }
 
     size_t read = fread(source, 1, (size_t)size, input);
-    if (read != (size_t)size && ferror(input)) {
+
+    if (read != (size_t)size) {
         free(source);
         fclose(input);
         return NULL;
@@ -43,19 +59,36 @@ static char *get_source(const char *path) {
     return source;
 }
 
-int lexer_init(Lexer *lexer, const char *path) {
-    char *source = get_source(path);
-    if (!source) return 0;
+Lexer *lexer_init(const char *path) {
+    if (!path) return NULL;
+
+    char *canonicalPath = get_canonical_path(path);
+    if (!canonicalPath) { 
+        return NULL;
+    }
+
+    char *source = get_source(canonicalPath);
+    if (!source) {
+        free(canonicalPath);
+        return NULL;
+    }
+
+    Lexer *lexer = malloc(sizeof(*lexer));
+    if (!lexer) {
+        free(canonicalPath);
+        free(source);
+        return NULL;
+    }
 
     *lexer = (Lexer) {
-        .path = path,
+        .path = canonicalPath,
         .source = source,
         .current = source,
         .line = 1,
         .column = 1,
     };
 
-    return 1;
+    return lexer;
 }
 
 static int is_identifier_start(const char c) {
@@ -191,6 +224,9 @@ static TokenType lexer_keyword_type(const char *start, const size_t length) {
     }
     else if (length == 6 && strncmp(start, "struct", 6) == 0) {
         return TOKEN_STRUCT;
+    }
+    else if (length == 7 && strncmp(start, "include", 7) == 0) {
+        return TOKEN_INCLUDE;
     }
     else if (length == 8 && strncmp(start, "continue", 8) == 0) {
         return TOKEN_CONTINUE;
@@ -442,7 +478,7 @@ Token lexer_next_token(Lexer *lexer) {
 void lexer_free(Lexer *lexer) {
     if (!lexer) return;
 
+    free(lexer->path);
     free(lexer->source);
-    lexer->source = NULL;
-    lexer->current = NULL;
+    free(lexer);
 }

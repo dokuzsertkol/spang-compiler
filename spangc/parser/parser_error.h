@@ -20,12 +20,20 @@ typedef enum {
     PARSER_ERROR_EXPECTED_BASE,
     PARSER_ERROR_INVALID_STATEMENT,
     PARSER_ERROR_INVALID_TOKEN,
+    PARSER_ERROR_INVALID_INCLUDE,
+    PARSER_ERROR_CIRCULAR_INCLUDE,
 } ParserErrorType;
 
 typedef struct {
     ParserErrorType type;
-    Token token;
+    const char *tokenStr;
     const char *message;
+
+    bool showToken; 
+
+    char *path;
+    size_t line;
+    size_t column;
 } ParserError;
 
 void parser_error(Parser *parser, ParserErrorType type);

@@ -3,6 +3,7 @@
 #include "lexer/lexer_print.h"
 #include "ast/ast_print.h"
 #include "parser/parser.h"
+#include "parser/parser_error.h"
 
 typedef struct {
     bool printTokens;
@@ -52,24 +53,25 @@ int main(int argc, char **argv) {
         }
     }
 
-    const char *dot = strrchr(argv[1], '.');
+    Lexer *lexer = lexer_init(argv[1]);
+    if (!lexer) return 1;
+    if (options.printTokens) lexer_print(lexer);
 
-    if (!dot || strcmp(dot, ".spg") != 0) {
-        fprintf(stderr, "Error: expected a .spg source file\n");
-        return 1;
+    Parser *parser = parser_init(lexer);
+    if (!parser) {
+        lexer_free(lexer);
+        return 0;
     }
 
-    Lexer lexer;
-    if (!lexer_init(&lexer, argv[1])) return 1;
-    if (options.printTokens) lexer_print(&lexer);
+    AST_Program *program = parse_program(parser);
+    if (options.printProgram && program) program_print(program);
+    parser_print_error(parser);
 
-    Parser parser = parser_init(&lexer);
-    AST_Program *program = parse_program(&parser);
-    parser_print_error(&parser);
-    if (options.printProgram) program_print(program);
-
-    lexer_free(&lexer);
     ast_program_free(program);
+    parser_free(parser);
+    lexer_free(lexer);
+
+    return parser->hasError ? 1 : 0;
 
     /*if (!semantic_analyse(&program)) {
         printf("SEMANTIC ERROR\n");

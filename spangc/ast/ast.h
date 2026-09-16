@@ -54,7 +54,7 @@ typedef struct {
 
 // variable
 typedef struct {
-    const char *name;
+    char *name;
     size_t length;
 } AST_Variable;
 
@@ -66,7 +66,7 @@ typedef struct {
 
 // field
 typedef struct {
-    const char *name;
+    char *name;
     size_t length;
     AST_Expression *offset;
     AST_Expression *size;
@@ -75,7 +75,7 @@ typedef struct {
 
 // struct
 typedef struct {
-    const char *name;
+    char *name;
     size_t length;
     AST_Field *fields;
     size_t fieldCount;
@@ -91,7 +91,7 @@ typedef struct {
 
 // member access
 typedef struct {
-    const char *name;
+    char *name;
     size_t length;
     AST_Expression *parent;
 } AST_MemberAccess;
@@ -105,7 +105,7 @@ typedef struct {
 
 // function
 typedef struct {
-    const char *name;
+    char *name;
     size_t length;
 
     AST_Expression *returnSize;
@@ -235,9 +235,14 @@ typedef struct {
     size_t count;
 } AST_Program;
 
+typedef struct {
+    char *path;
+} AST_Include;
+
 // node
 typedef enum {
     AST_PROGRAM,
+    AST_INCLUDE,
 
     AST_FUNCTION_DECLARATION,
     AST_VARIABLE_DECLARATION,
@@ -260,6 +265,7 @@ struct AST_Node {
     AST_NodeType type;
     union {
         AST_Program program;
+        AST_Include include;
 
         AST_FunctionDeclaration functionDeclaration;
         AST_Loop loop;
@@ -279,5 +285,6 @@ void ast_field_free(AST_Field *fields, size_t count);
 void ast_block_free(AST_Block *block);
 void ast_program_free(AST_Program *program);
 void ast_node_free(AST_Node *node);
-int block_add_statement(AST_Block *block, AST_Node *statement);
-int program_add_statement(AST_Program *program, AST_Node *statement);
+int ast_block_add_statement(AST_Block *block, AST_Node *statement);
+int ast_program_add_statement(AST_Program *program, AST_Node *statement);
+int ast_program_append_program(AST_Program *destination, AST_Program *source);

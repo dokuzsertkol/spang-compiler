@@ -40,6 +40,7 @@ static const char *token_type_to_string(const TokenType tokenType)  {
         case TOKEN_BREAK: return "BREAK";
         case TOKEN_CONTINUE: return "CONTINUE";
         case TOKEN_STRUCT: return "STRUCT";
+        case TOKEN_INCLUDE: return "INCLUDE";
 
         case TOKEN_I1: return "I1";
         case TOKEN_I2: return "I2";
@@ -84,7 +85,7 @@ void lexer_print(const Lexer *lexer) {
     do {
         token = lexer_next_token(&copy);
 
-        printf("TOKEN: %s:%zu:%zu \t", lexer->path, token.line, token.column);
+        printf("TOKEN: %s:%zu:%zu \t\t", lexer->path, token.line, token.column);
 
         printf("%s", token_type_to_string(token.type));
 

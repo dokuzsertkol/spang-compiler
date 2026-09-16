@@ -534,7 +534,9 @@ static void node_print(AST_Node *node, AST_PrintContext *ctx, bool last) {
         case AST_END:
             tree_line(ctx, last, "END");
             break;
-    }
+        case AST_INCLUDE:
+            break;
+        }
 }
 
 void program_print(AST_Program *program) {

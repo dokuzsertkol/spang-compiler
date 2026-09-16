@@ -34,13 +34,13 @@ void ast_expression_free(AST_Expression *exp) {
 
         case AST_EX_LOCATION: ast_expression_free(exp->location.offset); ast_expression_free(exp->location.size); break;
 
-        case AST_EX_VARIABLE:break;
+        case AST_EX_VARIABLE: free(exp->variable.name); break;
 
         case AST_EX_BINARY: ast_expression_free(exp->binary.left); ast_expression_free(exp->binary.right); break;
 
         case AST_EX_UNARY: ast_expression_free(exp->unary.operand); break;
 
-        case AST_EX_MEMBER_ACCESS: ast_expression_free(exp->memberAccess.parent); break;
+        case AST_EX_MEMBER_ACCESS: free(exp->memberAccess.name); ast_expression_free(exp->memberAccess.parent); break;
 
         case AST_EX_LOCATION_ACCESS: ast_expression_free(exp->locationAccess.parent); ast_expression_free(exp->locationAccess.size);
             ast_expression_free(exp->locationAccess.offset); break;
@@ -63,6 +63,7 @@ void ast_field_free(AST_Field *fields, size_t count) {
     for (size_t i = 0; i < count; i++) {
         ast_expression_free(fields[i].offset);
         ast_expression_free(fields[i].size);
+        free(fields[i].name);
     }
 
     free(fields);
@@ -83,13 +84,13 @@ void ast_node_free(AST_Node *node) {
     switch (node->type) {
         case AST_PROGRAM: ast_program_clear(&node->program); break;
 
-        case AST_FUNCTION_DECLARATION: ast_expression_free(node->functionDeclaration.returnSize); 
+        case AST_FUNCTION_DECLARATION: free(node->functionDeclaration.name); ast_expression_free(node->functionDeclaration.returnSize); 
             ast_block_free(node->functionDeclaration.body);
             ast_field_free(node->functionDeclaration.parameters, node->functionDeclaration.parameterCount); break;
 
-        case AST_VARIABLE_DECLARATION: ast_expression_free(node->variableDeclaration.initializer); break;
+        case AST_VARIABLE_DECLARATION: free(node->variableDeclaration.var.name); ast_expression_free(node->variableDeclaration.initializer); break;
 
-        case AST_STRUCT_DECLARATION: ast_field_free(node->structDeclaration.fields, node->structDeclaration.fieldCount); break;
+        case AST_STRUCT_DECLARATION: free(node->structDeclaration.name); ast_field_free(node->structDeclaration.fields, node->structDeclaration.fieldCount); break;
 
         case AST_ASSIGNMENT: ast_expression_free(node->assignment.target); ast_expression_free(node->assignment.value); break;
 
@@ -109,13 +110,15 @@ void ast_node_free(AST_Node *node) {
         case AST_SP_LOCATION: ast_expression_free(node->spLocation.initializer); break;
 
         case AST_END: break;
-    }
+
+        case AST_INCLUDE: free(node->include.path); break;
+        }
 
     free(node);
 }
 
-int block_add_statement(AST_Block *block, AST_Node *statement) {
-    if (!block) return 0;
+int ast_block_add_statement(AST_Block *block, AST_Node *statement) {
+    if (!block || !statement) return 0;
 
     if (block->count >= block->capacity) {
         int newCapacity = block->capacity == 0 ? 8 : block->capacity * 2;
@@ -131,8 +134,8 @@ int block_add_statement(AST_Block *block, AST_Node *statement) {
     return 1;
 }
 
-int program_add_statement(AST_Program *program, AST_Node *statement) {
-    if (!program) return 0;
+int ast_program_add_statement(AST_Program *program, AST_Node *statement) {
+    if (!program || !statement) return 0;
     
     if (program->count >= program->capacity) {
         int newCapacity = program->capacity == 0 ? 8 : program->capacity * 2;
@@ -145,5 +148,33 @@ int program_add_statement(AST_Program *program, AST_Node *statement) {
     }
 
     program->statements[program->count++] = statement;
+    return 1;
+}
+
+int ast_program_append_program(AST_Program *destination, AST_Program *source) {
+    if (!destination || !source) return 0;
+
+    size_t required = destination->count + source->count;
+
+    while (destination->capacity < required) {
+        int newCapacity = destination->capacity == 0 ? 8 : destination->capacity * 2;
+
+        AST_Node **newStatements = realloc(destination->statements, sizeof(AST_Node *) * newCapacity);
+        if (!newStatements) return 0;
+
+        destination->statements = newStatements;
+        destination->capacity = newCapacity;
+    }
+
+    for (size_t i = 0; i < source->count; i++) {
+        destination->statements[destination->count++] = source->statements[i];
+    }
+    
+    free(source->statements);
+
+    source->statements = NULL;
+    source->count = 0;
+    source->capacity = 0;
+
     return 1;
 }
