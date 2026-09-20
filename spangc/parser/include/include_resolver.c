@@ -3,17 +3,7 @@
 #include "include_resolver.h"
 #include "../parser.h"
 
-IncludeResolver *include_resolver_init(Parser *parser) {
-    if (!parser) return NULL;
-
-    IncludeResolver *resolver = malloc(sizeof(*resolver));
-    if (!resolver) return NULL;
-
-    *resolver = (IncludeResolver ){ .parser = parser };
-    return resolver;
-}
-
-static int path_exists(char **paths, size_t count, const char *path) {
+static int path_exists(const char **paths, size_t count, const char *path) {
     for (size_t i = 0; i < count; i++) if (strcmp(paths[i], path) == 0) return 1;
     return 0;
 }
@@ -25,13 +15,13 @@ static int active_paths_pop(IncludeResolver *resolver) {
     return 1;
 }
 
-static int active_paths_push(IncludeResolver *resolver, char* path) {
+static int active_paths_push(IncludeResolver *resolver, const char* path) {
     if (!resolver) return 0;
     
     if (resolver->activeCount >= resolver->activeCapacity) {
         int newCapacity = resolver->activeCapacity == 0 ? 8 : resolver->activeCapacity * 2;
 
-        char **newActivePaths = realloc(resolver->activePaths, sizeof(char *) * newCapacity);
+        const char **newActivePaths = realloc(resolver->activePaths, sizeof(char *) * newCapacity);
         if (!newActivePaths) return 0;
 
         resolver->activePaths = newActivePaths;
@@ -42,13 +32,13 @@ static int active_paths_push(IncludeResolver *resolver, char* path) {
     return 1;
 }
 
-static int included_paths_push(IncludeResolver *resolver, char* path) {
+static int included_paths_push(IncludeResolver *resolver, const char* path) {
     if (!resolver) return 0;
     
     if (resolver->includedCount >= resolver->includedCapacity) {
         int newCapacity = resolver->includedCapacity == 0 ? 8 : resolver->includedCapacity * 2;
 
-        char **newIncludedPaths = realloc(resolver->includedPaths, sizeof(char *) * newCapacity);
+        const char **newIncludedPaths = realloc(resolver->includedPaths, sizeof(char *) * newCapacity);
         if (!newIncludedPaths) return 0;
 
         resolver->includedPaths = newIncludedPaths;
@@ -90,10 +80,9 @@ IncludeResult include_resolver_parse(IncludeResolver *resolver, const char *path
     *program = NULL;
 
     char *resolvedPath = resolve_include_path(resolver->parser->lexer->path, path);
-
     if (!resolvedPath) return INCLUDE_RESULT_ERROR;
 
-    Lexer *newLexer = lexer_init(resolvedPath);
+    Lexer *newLexer = lexer_init(resolver->parser->manager, resolvedPath);
     free(resolvedPath);
     if (!newLexer) return INCLUDE_RESULT_ERROR;
 
@@ -131,9 +120,7 @@ IncludeResult include_resolver_parse(IncludeResolver *resolver, const char *path
         return INCLUDE_RESULT_ERROR;
     }
 
-    char *includedPath = strdup(newLexer->path);
-    if (!includedPath || !included_paths_push(resolver, includedPath)) {
-        free(includedPath);
+    if (!included_paths_push(resolver, newLexer->path)) {
         ast_program_free(*program);
         *program = NULL;
         lexer_free(newLexer);
@@ -146,10 +133,23 @@ IncludeResult include_resolver_parse(IncludeResolver *resolver, const char *path
     return INCLUDE_RESULT_SUCCESS;
 }
 
+IncludeResolver *include_resolver_init(Parser *parser) {
+    if (!parser) return NULL;
+
+    IncludeResolver *resolver = malloc(sizeof(*resolver));
+    if (!resolver) return NULL;
+
+    *resolver = (IncludeResolver ){ .parser = parser };
+    
+    if (!active_paths_push(resolver, parser->lexer->path)) {
+        free(resolver);
+        return NULL;
+    }
+    return resolver;
+}
+
 void include_resolver_free(IncludeResolver *resolver) {
     if (!resolver) return;
-
-    for (size_t i = 0; i < resolver->includedCount; i++) free(resolver->includedPaths[i]);
 
     free(resolver->includedPaths);
     free(resolver->activePaths);

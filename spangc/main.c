@@ -4,6 +4,7 @@
 #include "ast/ast_print.h"
 #include "parser/parser.h"
 #include "parser/parser_error.h"
+#include "source/source_manager.h"
 
 typedef struct {
     bool printTokens;
@@ -53,11 +54,18 @@ int main(int argc, char **argv) {
         }
     }
 
-    Lexer *lexer = lexer_init(argv[1]);
-    if (!lexer) return 1;
+    SourceManager *manager = source_manager_init();
+    if (!manager) return 1;
+
+
+    Lexer *lexer = lexer_init(manager, argv[1]);
+    if (!lexer) {
+        source_manager_free(manager);
+        return 1;
+    }
     if (options.printTokens) lexer_print(lexer);
 
-    Parser *parser = parser_init(lexer);
+    Parser *parser = parser_init(manager, lexer);
     if (!parser) {
         lexer_free(lexer);
         return 0;

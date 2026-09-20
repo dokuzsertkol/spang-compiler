@@ -3,12 +3,7 @@
 #include "parser.h"
 #include "parser_error.h"
 
-static void parser_error_at(
-    Parser *parser,
-    ParserErrorType type,
-    const char *message,
-    Token token
-) {
+static void parser_error_at(Parser *parser, ParserErrorType type, const char *message, Token token) {
     if (parser->hasError) return;
 
     parser->hasError = true;

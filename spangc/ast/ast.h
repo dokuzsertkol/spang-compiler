@@ -6,6 +6,13 @@
 typedef struct AST_Node AST_Node;
 typedef struct AST_Expression AST_Expression;
 
+// sources location
+typedef struct {
+    const char *sourcePath;
+    size_t line;
+    size_t column;
+} SourceLocation;
+
 // literal
 typedef enum {
     AST_LITERAL_INT,
@@ -199,6 +206,7 @@ struct AST_Expression {
             size_t argumentCount;
         } call;
     };
+    SourceLocation source;
 };
 
 typedef struct {
@@ -278,6 +286,7 @@ struct AST_Node {
         AST_StructDeclaration structDeclaration;
         AST_SPLocation spLocation;
     };
+    SourceLocation source;
 };
 
 void ast_expression_free(AST_Expression *exp);

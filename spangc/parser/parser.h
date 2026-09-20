@@ -7,11 +7,15 @@
 typedef struct Parser {
     Lexer *lexer;
     Token current;
-    ParserError error;
+
     IncludeResolver *resolver;
+
+    ParserError error;
     int hasError;
+
+    SourceManager *manager;
 } Parser;
 
-Parser *parser_init(Lexer *lexer);
+Parser *parser_init(SourceManager *manager, Lexer *lexer);
 void parser_free(Parser *parser);
 AST_Program *parse_program(Parser *parser);

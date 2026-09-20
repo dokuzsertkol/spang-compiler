@@ -3,21 +3,6 @@
 #include <stdio.h>
 #include "lexer.h"
 
-char *get_canonical_path(const char* path) {
-    const char *dot = strrchr(path, '.');
-
-    if (!dot || strcmp(dot, ".spg") != 0) {
-        fprintf(stderr, "Error: expected a .spg source file\n");
-        return NULL;
-    }
-
-    char *canonicalPath = realpath(path, NULL);
-    if (!canonicalPath) {
-        fprintf(stderr, "Error: included file not found: %s\n", path);
-    }
-    return canonicalPath;
-}
-
 static char *get_source(const char *path) {
     FILE *input = fopen(path, "rb");
     if (!input) {
@@ -59,23 +44,17 @@ static char *get_source(const char *path) {
     return source;
 }
 
-Lexer *lexer_init(const char *path) {
+Lexer *lexer_init(SourceManager *manager, const char *path) {
     if (!path) return NULL;
-
-    char *canonicalPath = get_canonical_path(path);
-    if (!canonicalPath) { 
-        return NULL;
-    }
+    
+    const char *canonicalPath = source_manager_add(manager, path);
+    if (!canonicalPath) return NULL;
 
     char *source = get_source(canonicalPath);
-    if (!source) {
-        free(canonicalPath);
-        return NULL;
-    }
+    if (!source) return NULL;
 
     Lexer *lexer = malloc(sizeof(*lexer));
     if (!lexer) {
-        free(canonicalPath);
         free(source);
         return NULL;
     }
@@ -478,7 +457,6 @@ Token lexer_next_token(Lexer *lexer) {
 void lexer_free(Lexer *lexer) {
     if (!lexer) return;
 
-    free(lexer->path);
     free(lexer->source);
     free(lexer);
 }

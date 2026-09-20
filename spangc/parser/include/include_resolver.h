@@ -1,6 +1,6 @@
 #pragma once
-#include "../../ast/ast.h"
 #include <stddef.h>
+#include "../../ast/ast.h"
 
 typedef struct Parser Parser;
 
@@ -13,13 +13,14 @@ typedef enum {
 typedef struct {
     Parser *parser;
 
-    char **includedPaths;
+    const char **includedPaths;
     size_t includedCount;
     size_t includedCapacity;
 
-    char **activePaths;
+    const char **activePaths;
     size_t activeCount;
     size_t activeCapacity;
+
 } IncludeResolver;
 
 IncludeResolver *include_resolver_init(Parser *parser);

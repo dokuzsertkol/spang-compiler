@@ -17,7 +17,9 @@ static int parser_next(Parser *parser) {
     return 1;
 }
 
-Parser *parser_init(Lexer *lexer) {
+Parser *parser_init(SourceManager *manager, Lexer *lexer) {
+    if (!manager || !lexer) return NULL;
+
     Parser *parser = malloc(sizeof(*parser));
     if (!parser) return NULL;
 
@@ -25,6 +27,7 @@ Parser *parser_init(Lexer *lexer) {
         .lexer = lexer,
         .current = {0},
         .hasError = 0,
+        .manager = manager,
     };
     parser_next(parser);
     
@@ -165,8 +168,15 @@ static AST_Expression *parse_literal(Parser *parser) {
     AST_Expression *exp = malloc(sizeof(*exp));
     if (!exp) return NULL;
 
-    exp->type = AST_EX_LITERAL;
-    exp->literal.length = 0;
+    *exp = (AST_Expression) {
+        .type = AST_EX_LITERAL,
+        .literal.length = 0,
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = parser->current.column,
+            .line = parser->current.line,
+        },
+    };
 
     switch (parser->current.type) {
         case TOKEN_INT_LITERAL:
@@ -254,6 +264,11 @@ static AST_Expression *parse_identifier(Parser *parser) {
             .name = strndup(parser->current.start, parser->current.length),
             .length = parser->current.length,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = parser->current.column,
+            .line = parser->current.line,
+        },
     };
 
     if (!parser_next(parser)) {
@@ -285,7 +300,14 @@ static AST_Expression *parse_data_type(Parser *parser) {
     AST_Expression *exp = malloc(sizeof(*exp));
     if (!exp) return NULL;
 
-    exp->type = AST_EX_DATA_TYPE;
+    *exp = (AST_Expression) {
+        .type = AST_EX_DATA_TYPE,
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = parser->current.column,
+            .line = parser->current.line,
+        },
+    };
 
     switch (parser->current.type) {
         case TOKEN_I1: exp->dataType = AST_DATA_I1; break;
@@ -314,6 +336,7 @@ static AST_Expression *parse_data_type(Parser *parser) {
 }
 
 static AST_Expression *parse_sp(Parser *parser) {
+    Token token = parser->current;
     if(!parser_match(parser, TOKEN_SP)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -324,6 +347,11 @@ static AST_Expression *parse_sp(Parser *parser) {
 
     *exp = (AST_Expression) {
         .type = AST_EX_SP,
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
     return exp;
 } 
@@ -351,6 +379,7 @@ static AST_Expression *parse_primary(Parser *parser) {
 }
 
 static AST_Expression *parse_location_access(Parser *parser, AST_Expression *exp) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_LEFT_BRACKET)) {
         ast_expression_free(exp);
         parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_BRACKET);
@@ -403,6 +432,11 @@ static AST_Expression *parse_location_access(Parser *parser, AST_Expression *exp
             .size = size,
             .readAs = readAs,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
 
     return access;
@@ -430,12 +464,18 @@ static AST_Expression *parse_member_access(Parser *parser, AST_Expression *exp) 
             .name = strndup(member.start, member.length),
             .length = member.length,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = member.column,
+            .line = member.line,
+        },
     };
 
     return access;
 }
 
 static AST_Expression *parse_call(Parser *parser, AST_Expression *exp) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_LEFT_PAREN)) {
         ast_expression_free(exp);
         parser_error(parser, PARSER_ERROR_EXPECTED_LEFT_PAREN);
@@ -454,6 +494,11 @@ static AST_Expression *parse_call(Parser *parser, AST_Expression *exp) {
             .function = exp,
             .arguments = NULL,
             .argumentCount = 0,
+        },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
         },
     };
 
@@ -544,7 +589,7 @@ static AST_Expression *parse_postfix(Parser *parser) {
 
 static AST_Expression *parse_unary(Parser *parser) {
     if (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS || parser->current.type == TOKEN_EXCLAM) {
-        TokenType op = parser->current.type;
+        Token token = parser->current;
         if (!parser_next(parser)) return NULL;
 
         AST_Expression *operand = parse_unary(parser);
@@ -556,10 +601,19 @@ static AST_Expression *parse_unary(Parser *parser) {
             return NULL;
         }
 
-        exp->type = AST_EX_UNARY;
-        exp->unary.operand = operand;
+        *exp = (AST_Expression) {
+            .type = AST_EX_UNARY,
+            .unary = {
+                .operand = operand,
+            },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
+            },
+        };
 
-        switch (op) {
+        switch (token.type) {
             case TOKEN_PLUS: exp->unary.op = AST_OP_PLUS; break;
 
             case TOKEN_MINUS: exp->unary.op = AST_OP_MINUS; break;
@@ -578,7 +632,7 @@ static AST_Expression *parse_multiplicative(Parser *parser) {
     if (!left) return NULL;
 
     while (parser->current.type == TOKEN_ASTER || parser->current.type == TOKEN_SLASH) {
-        TokenType op = parser->current.type;
+        Token token = parser->current;
 
         if (!parser_next(parser)) {
             ast_expression_free(left);
@@ -604,9 +658,14 @@ static AST_Expression *parse_multiplicative(Parser *parser) {
                 .left = left,
                 .right = right,
             },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
+            },
         };
 
-        switch (op) {
+        switch (token.type) {
             case TOKEN_ASTER: binary->binary.op = AST_OP_MULTIPLY; break;
 
             case TOKEN_SLASH: binary->binary.op = AST_OP_DIVIDE; break;
@@ -625,7 +684,7 @@ static AST_Expression *parse_additive(Parser *parser) {
     if (!left) return NULL;
 
     while (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS) {
-        TokenType op = parser->current.type;
+        Token token = parser->current;
 
         if (!parser_next(parser)) {
             ast_expression_free(left);
@@ -651,9 +710,14 @@ static AST_Expression *parse_additive(Parser *parser) {
                 .left = left,
                 .right = right,
             },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
+            },
         };
 
-        switch (op) {
+        switch (token.type) {
             case TOKEN_PLUS: binary->binary.op = AST_OP_PLUS; break;
 
             case TOKEN_MINUS: binary->binary.op = AST_OP_MINUS; break;
@@ -673,7 +737,7 @@ static AST_Expression *parse_comparison(Parser *parser) {
     while (parser->current.type == TOKEN_LESS || parser->current.type == TOKEN_GREATER 
         || parser->current.type == TOKEN_LESS_EQUAL || parser->current.type == TOKEN_GREATER_EQUAL) {
 
-        TokenType op = parser->current.type;
+        Token token = parser->current;
 
         if (!parser_next(parser)) {
             ast_expression_free(left);
@@ -699,9 +763,14 @@ static AST_Expression *parse_comparison(Parser *parser) {
                 .left = left,
                 .right = right,
             },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
+            },
         };
 
-        switch (op) {
+        switch (token.type) {
             case TOKEN_LESS: binary->binary.op = AST_OP_LESS; break;
 
             case TOKEN_GREATER: binary->binary.op = AST_OP_GREATER; break;
@@ -726,8 +795,7 @@ static AST_Expression *parse_equality(Parser *parser) {
     if (!left) return NULL;
 
     while (parser->current.type == TOKEN_EQUAL_EQUAL || parser->current.type == TOKEN_NOT_EQUAL) {
-
-        TokenType op = parser->current.type;
+        Token token = parser->current;
 
         if (!parser_next(parser)) {
             ast_expression_free(left);
@@ -753,9 +821,14 @@ static AST_Expression *parse_equality(Parser *parser) {
                 .left = left,
                 .right = right,
             },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
+            },
         };
 
-        switch (op) {
+        switch (token.type) {
             case TOKEN_EQUAL_EQUAL: binary->binary.op = AST_OP_EQUAL; break;
 
             case TOKEN_NOT_EQUAL: binary->binary.op = AST_OP_NOT_EQUAL; break;
@@ -776,6 +849,7 @@ static AST_Expression *parse_logical_and(Parser *parser) {
     if (!left) return NULL;
 
     while (parser->current.type == TOKEN_AMPERS_AMPERS) {
+        Token token = parser->current;
         if (!parser_next(parser)) {
             ast_expression_free(left);
             return NULL;
@@ -801,6 +875,11 @@ static AST_Expression *parse_logical_and(Parser *parser) {
                 .right = right,
                 .op = AST_OP_AND,
             },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
+            },
         };
 
         left = binary;
@@ -814,6 +893,7 @@ static AST_Expression *parse_logical_or(Parser *parser) {
     if (!left) return NULL;
 
     while (parser->current.type == TOKEN_BAR_BAR) {
+        Token token = parser->current;
         if (!parser_next(parser)) {
             ast_expression_free(left);
             return NULL;
@@ -838,6 +918,11 @@ static AST_Expression *parse_logical_or(Parser *parser) {
                 .left = left,
                 .right = right,
                 .op = AST_OP_OR,
+            },
+            .source = {
+                .sourcePath = parser->lexer->path,
+                .column = token.column,
+                .line = token.line,
             },
         };
 
@@ -930,7 +1015,12 @@ static AST_Node *parse_variable_assignment(Parser *parser, AST_Expression *targe
         .assignment = (AST_Assignment){
             .target = target,
             .value = exp,
-        }
+        },
+        .source = {
+            .sourcePath = target->source.sourcePath,
+            .column = target->source.column,
+            .line = target->source.line,
+        },
     };
 
     return node;
@@ -985,17 +1075,20 @@ static AST_Node *parse_variable_declaration(Parser *parser, AST_Expression *targ
         return NULL; 
     }
 
-    AST_Variable variable = target->variable;
-    free(target);
-
     *node = (AST_Node) {
         .type = AST_VARIABLE_DECLARATION,
         .variableDeclaration = (AST_VariableDeclaration) {
             .location = loc,
-            .var = variable,
+            .var = target->variable,
             .initializer = initializer,
-        }
+        },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = target->source.column,
+            .line = target->source.line,
+        },
     };
+    free(target);
 
     return node;
 }
@@ -1018,6 +1111,11 @@ static AST_Node *parse_expression_statement(Parser *parser, AST_Expression *targ
         .expressionStatement = {
             .expression = target,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = target->source.column,
+            .line = target->source.line,
+        },
     };
     return node;
 }
@@ -1038,6 +1136,8 @@ static AST_Node *parse_identifier_statement(Parser *parser) {
 }
 
 static AST_Node *parse_location_assignment(Parser *parser) {
+    Token token = parser->current;
+
     AST_Location loc = {0};
     if(!parse_location(parser, &loc)) return NULL;
 
@@ -1088,11 +1188,17 @@ static AST_Node *parse_location_assignment(Parser *parser) {
             .target = location,
             .value = exp,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
     return node;
 }
 
 static AST_Node *parse_struct_declaration(Parser *parser) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_STRUCT)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1119,6 +1225,11 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
             .length = identifier.length,
             .fields = NULL,
             .fieldCount = 0,
+        },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
         },
     };
 
@@ -1171,6 +1282,7 @@ static AST_Node *parse_struct_declaration(Parser *parser) {
 }
 
 static AST_Node *parse_function_declaration(Parser *parser) {
+    Token token = parser->current;
     if(!parser_match(parser, TOKEN_FP)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1198,6 +1310,11 @@ static AST_Node *parse_function_declaration(Parser *parser) {
             .parameters = NULL,
             .parameterCount = 0,
             .body = NULL,
+        },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
         },
     };
 
@@ -1281,6 +1398,7 @@ static AST_Node *parse_function_declaration(Parser *parser) {
 }
 
 static AST_Node *parse_return_statement(Parser *parser) {
+    Token token = parser->current;
     if(!parser_match(parser, TOKEN_RETURN)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1310,11 +1428,17 @@ static AST_Node *parse_return_statement(Parser *parser) {
         .returnStatement = {
             .value = value,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
     return node;
 }
 
 static AST_Node *parse_if_statement(Parser *parser) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_IF)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1365,12 +1489,18 @@ static AST_Node *parse_if_statement(Parser *parser) {
             .thenBody = thenBody,
             .elseBody = elseBody,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
 
     return node;
 }
 
 static AST_Node *parse_while_statement(Parser *parser) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_WHILE)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1409,12 +1539,18 @@ static AST_Node *parse_while_statement(Parser *parser) {
             .condition = condition,
             .body = body,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
 
     return node;
 }
 
 static AST_Node *parse_break_statement(Parser *parser) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_BREAK)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1428,12 +1564,20 @@ static AST_Node *parse_break_statement(Parser *parser) {
     AST_Node *node = malloc(sizeof(*node));
     if (!node) return NULL;
 
-    *node = (AST_Node){ .type = AST_BREAK };
+    *node = (AST_Node){
+        .type = AST_BREAK,
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
+    };
 
     return node;
 }
 
 static AST_Node *parse_continue_statement(Parser *parser) {
+    Token token = parser->current;
     if (!parser_match(parser, TOKEN_CONTINUE)) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
@@ -1447,7 +1591,14 @@ static AST_Node *parse_continue_statement(Parser *parser) {
     AST_Node *node = malloc(sizeof(*node));
     if (!node) return NULL;
 
-    *node = (AST_Node){ .type = AST_CONTINUE };
+    *node = (AST_Node){
+        .type = AST_CONTINUE,
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
+    };
     return node;
 }
 
@@ -1484,6 +1635,11 @@ static AST_Node *parse_sp_assignment(Parser *parser, AST_Expression *target) {
             .target = target,
             .value = value,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = target->source.column,
+            .line = target->source.line,
+        },
     };
     return node;
 }
@@ -1494,7 +1650,6 @@ static AST_Node *parse_sp_location(Parser *parser, AST_Expression *target) {
         parser_error(parser, PARSER_ERROR_UNEXPECTED_TOKEN);
         return NULL;
     }
-    ast_expression_free(target);
 
     AST_Location loc = {0};
     if (!parse_location(parser, &loc)) {
@@ -1539,7 +1694,13 @@ static AST_Node *parse_sp_location(Parser *parser, AST_Expression *target) {
             .location = loc,
             .initializer = initializer,
         },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = target->source.column,
+            .line = target->source.line,
+        },
     };
+    ast_expression_free(target);
     return node;
 }
 
@@ -1586,7 +1747,12 @@ static AST_Node *parse_include_statement(Parser *parser) {
         .type = AST_INCLUDE,
         .include = {
             .path = path,
-        }
+        },
+        .source = {
+            .sourcePath = parser->lexer->path,
+            .column = token.column,
+            .line = token.line,
+        },
     };
 
     return node;
