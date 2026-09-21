@@ -26,12 +26,12 @@ typedef enum {
 
 typedef struct {
     ParserErrorType type;
-    const char *tokenStr;
+    char *tokenStr;
     const char *message;
 
     bool showToken; 
 
-    char *path;
+    const char *path;
     size_t line;
     size_t column;
 } ParserError;

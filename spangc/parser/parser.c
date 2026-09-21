@@ -44,6 +44,7 @@ void parser_free(Parser *parser) {
     if (!parser) return;
 
     include_resolver_free(parser->resolver);
+    free(parser->error.tokenStr);
     free(parser);
 }
 

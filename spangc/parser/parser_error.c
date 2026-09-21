@@ -12,7 +12,7 @@ static void parser_error_at(Parser *parser, ParserErrorType type, const char *me
         .type = type,
         .line = token.line,
         .column = token.column,
-        .path = strdup(parser->lexer->path),
+        .path = parser->lexer->path,
         .tokenStr = strndup(token.start, token.length),
         .message = message,
     };
@@ -120,7 +120,7 @@ void parser_print_error(const Parser *parser) {
 
     const ParserError *error = &parser->error;
 
-    fprintf(stderr, "%s:%zu:%zu: error: %s", error->path, error->line, error->column, error->message);
+    fprintf(stderr, "%s:%zu:%zu: parse error: %s", error->path, error->line, error->column, error->message);
 
     if (error->showToken) fprintf(stderr, ", got '%s'", error->tokenStr);
 
