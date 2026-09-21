@@ -1,10 +1,11 @@
 #include <string.h>
 #include <stdio.h>
+#include "semantic/semantic_error.h"
+#include "source/source_manager.h"
 #include "lexer/lexer_print.h"
 #include "ast/ast_print.h"
 #include "parser/parser.h"
-#include "parser/parser_error.h"
-#include "source/source_manager.h"
+#include "semantic/semantic.h"
 
 typedef struct {
     bool printTokens;
@@ -75,18 +76,30 @@ int main(int argc, char **argv) {
     if (options.printProgram && program) program_print(program);
     parser_print_error(parser);
 
-    ast_program_free(program);
-    parser_free(parser);
-    lexer_free(lexer);
+    SemanticAnalyser *analyser = semantic_analyser_init();
+    if (!analyser) {
+        ast_program_free(program);
+        parser_free(parser);
+        lexer_free(lexer);
+        return 0;
+    }
+    if (!semantic_analyse(analyser, program)) {
+        semantic_print_error(analyser);
 
-    return parser->hasError ? 1 : 0;
+        ast_program_free(program);
+        parser_free(parser);
+        lexer_free(lexer);
+        source_manager_free(manager);
 
-    /*if (!semantic_analyse(&program)) {
-        printf("SEMANTIC ERROR\n");
         return 1;
     }
 
-    IR ir = ir_generate(&program);
+    ast_program_free(program);
+    parser_free(parser);
+    lexer_free(lexer);
+    source_manager_free(manager);
+
+    /*IR ir = ir_generate(&program);
     ir_print(&ir);
 
     if (!codegen_generate(&ir, "./output/main.s")) {

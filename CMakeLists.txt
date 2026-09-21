@@ -7,6 +7,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(spangc
     spangc/main.c
+    spangc/source/source_manager.c
     spangc/token/token.c
     spangc/lexer/lexer.c
     spangc/lexer/lexer_print.c
@@ -15,6 +16,8 @@ add_executable(spangc
     spangc/parser/parser.c
     spangc/parser/parser_error.c
     spangc/parser/include/include_resolver.c
+    spangc/semantic/semantic.c
+    spangc/semantic/semantic_error.c
 )
 
 target_include_directories(spangc PRIVATE ${PROJECT_SOURCE_DIR}/spangc)
